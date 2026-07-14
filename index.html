@@ -6,8 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-title" content="SteviTrack">
 <link rel="manifest" href="manifest.json">
-<title>Stevi Tennis Performance</title>
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<title>Stevi Performance Tracker</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -163,11 +166,11 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:#3b82f6;box-sh
       <div class="font-semibold text-sm">Log Weight</div>
       <div class="text-xs text-slate-400">Body tracking</div>
     </button>
-    <button onclick="startQuickLog('zwift')" class="bg-card hover:bg-cardHover rounded-xl p-4 text-left metric-card">
+    <a href="zwift.html" class="bg-card hover:bg-cardHover rounded-xl p-4 text-left metric-card block">
       <div class="text-2xl mb-1">🚴</div>
-      <div class="font-semibold text-sm">Log Zwift</div>
-      <div class="text-xs text-slate-400">Cycling session</div>
-    </button>
+      <div class="font-semibold text-sm">Zwift Analyzer</div>
+      <div class="text-xs text-orange-400">Upload FIT · WTRL TTT</div>
+    </a>
   </div>
 
   <!-- Mini Weight Chart -->
@@ -1113,7 +1116,10 @@ function showSettingsModal() {
       <hr class="border-slate-600">
       <div class="text-xs text-slate-400">Data Management</div>
       <button onclick="exportData()" class="btn btn-ghost w-full">Export All Data (JSON)</button>
-      <button onclick="if(confirm('Delete ALL data? This cannot be undone.')){Object.keys(localStorage).filter(k=>k.startsWith('stevi_')).forEach(k=>localStorage.removeItem(k));location.reload()}" class="btn btn-danger w-full">Reset All Data</button>
+      <button onclick="document.getElementById('importFile').click()" class="btn btn-ghost w-full">Import Data (JSON Backup)</button>
+      <input type="file" id="importFile" accept=".json" class="hidden" onchange="importData(this.files[0])">
+      <div class="text-xs text-green-400 mt-1">Data stored locally on your device only — never uploaded.</div>
+      <button onclick="if(confirm('Delete ALL data? This cannot be undone.')){Object.keys(localStorage).filter(k=>k.startsWith('stevi_')).forEach(k=>localStorage.removeItem(k));location.reload()}" class="btn btn-danger w-full mt-2">Reset All Data</button>
     </div>`;
   document.getElementById('modalOverlay').classList.remove('hidden');
 }
@@ -1123,12 +1129,40 @@ function exportData() {
   Object.keys(localStorage).filter(k => k.startsWith('stevi_')).forEach(k => {
     data[k.replace('stevi_', '')] = JSON.parse(localStorage.getItem(k));
   });
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const zwiftData = {};
+  Object.keys(localStorage).filter(k => k.startsWith('zwift_')).forEach(k => {
+    zwiftData[k.replace('zwift_', '')] = JSON.parse(localStorage.getItem(k));
+  });
+  const backup = { _version: 2, _date: new Date().toISOString(), tennis: data, zwift: zwiftData };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `stevi-tennis-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `stevi-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
-  showToast('Data exported!', 'success');
+  showToast('Full backup exported!', 'success');
+}
+
+function importData(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (imported._version === 2) {
+        if (imported.tennis) Object.entries(imported.tennis).forEach(([k,v]) => localStorage.setItem('stevi_' + k, JSON.stringify(v)));
+        if (imported.zwift) Object.entries(imported.zwift).forEach(([k,v]) => localStorage.setItem('zwift_' + k, JSON.stringify(v)));
+      } else {
+        Object.entries(imported).forEach(([k,v]) => {
+          if (!k.startsWith('_')) localStorage.setItem('stevi_' + k, JSON.stringify(v));
+        });
+      }
+      closeModal();
+      location.reload();
+    } catch(err) {
+      showToast('Invalid backup file', 'error');
+    }
+  };
+  reader.readAsText(file);
 }
 
 function closeModal(e) {

@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-title" content="SteviTrack">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<title>Zwift Analyzer — Stevi</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>tailwind.config={theme:{extend:{colors:{dark:'#0f172a',card:'#1e293b',accent:'#3b82f6',tennis:'#22c55e',warn:'#f59e0b',danger:'#ef4444',zwift:'#f97316'}}}}</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+*{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:#0f172a;color:#f8fafc;overscroll-behavior:none}
+.page{display:none;animation:fadeIn .2s ease}.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+input,select,textarea{background:#334155;border:1px solid #475569;color:#f8fafc;border-radius:.5rem;padding:.5rem .75rem;width:100%;font-size:16px}
+input:focus,select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.3)}
+.btn{padding:.5rem 1rem;border-radius:.5rem;font-weight:600;font-size:.875rem;transition:all .15s;cursor:pointer;border:none}
+.btn:active{transform:scale(.95)}
+.btn-primary{background:#3b82f6;color:white}
+.btn-success{background:#22c55e;color:white}
+.btn-orange{background:#f97316;color:white}
+.btn-ghost{background:transparent;color:#94a3b8;border:1px solid #475569}
+.tab-btn{flex:1;padding:.5rem;text-align:center;border-radius:.5rem;font-size:.75rem;font-weight:600;transition:all .15s}
+.tab-btn.active{background:#f97316;color:white}
+.badge{display:inline-block;padding:2px 8px;border-radius:9999px;font-size:.7rem;font-weight:600}
+.safe-top{padding-top:max(env(safe-area-inset-top),20px)}
+.safe-bottom{padding-bottom:max(calc(env(safe-area-inset-bottom)+70px),90px)}
+.glass{background:rgba(30,41,59,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.drop-zone{border:2px dashed #475569;border-radius:1rem;padding:2rem;text-align:center;transition:all .2s;cursor:pointer}
+.drop-zone.dragover{border-color:#f97316;background:rgba(249,115,22,.1)}
+.drop-zone:active{transform:scale(.98)}
+.metric-card{transition:transform .15s}.metric-card:active{transform:scale(.97)}
+.zone-bar{height:8px;border-radius:4px;transition:width .5s ease}
+.toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:.75rem 1.5rem;border-radius:.75rem;font-size:.875rem;font-weight:600;z-index:100;animation:toastIn .3s ease}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.coach-card{border-left:3px solid;padding:.75rem 1rem;border-radius:0 .5rem .5rem 0;margin-bottom:.75rem}
+::-webkit-scrollbar{width:0}
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="glass fixed top-0 left-0 right-0 z-40 safe-top px-4 pb-2">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <a href="index.html" class="text-slate-400 text-lg">←</a>
+      <div>
+        <h1 class="text-lg font-bold">🚴 Zwift Analyzer</h1>
+        <p class="text-xs text-slate-400">FTP: <span id="headerFTP">180</span>W · <span id="headerWkg">2.28</span> W/kg · <span id="headerWeight">79</span>kg</p>
+      </div>
+    </div>
+    <button onclick="showSettings()" class="text-slate-400">⚙️</button>
+  </div>
+</header>
+
+<div class="flex gap-1 bg-card rounded-xl p-1 mx-4 mt-20 mb-3 sticky top-16 z-30">
+  <button class="tab-btn active" onclick="showPage('upload',this)">Upload</button>
+  <button class="tab-btn" onclick="showPage('analysis',this)">Analysis</button>
+  <button class="tab-btn" onclick="showPage('wtrl',this)">WTRL TTT</button>
+  <button class="tab-btn" onclick="showPage('history',this)">History</button>
+</div>
+
+<main class="px-4 safe-bottom">
+
+<!-- ===== UPLOAD PAGE ===== -->
+<div id="pageUpload" class="page active">
+  <div class="drop-zone" id="dropZone" onclick="document.getElementById('fitInput').click()">
+    <input type="file" id="fitInput" accept=".fit" class="hidden" onchange="handleFile(this.files[0])">
+    <div class="text-4xl mb-3">📂</div>
+    <div class="font-bold text-lg">Drop .FIT file here</div>
+    <div class="text-sm text-slate-400 mt-1">or tap to browse</div>
+    <div class="text-xs text-slate-500 mt-3">Supports Garmin / Zwift / Wahoo .FIT files</div>
+  </div>
+
+  <div id="uploadStatus" class="hidden mt-4 bg-card rounded-xl p-4">
+    <div class="flex items-center gap-3">
+      <div class="animate-spin text-2xl" id="uploadSpinner">⏳</div>
+      <div>
+        <div class="font-semibold" id="uploadMsg">Parsing FIT file...</div>
+        <div class="text-xs text-slate-400" id="uploadDetail"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Manual Entry -->
+  <div class="bg-card rounded-xl p-4 mt-4">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">Quick Manual Entry</h3>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="text-xs text-slate-400">Duration (min)</label><input type="number" id="manDuration" placeholder="45"></div>
+      <div><label class="text-xs text-slate-400">Avg Power (W)</label><input type="number" id="manPower" placeholder="180"></div>
+      <div><label class="text-xs text-slate-400">NP (W)</label><input type="number" id="manNP" placeholder="190"></div>
+      <div><label class="text-xs text-slate-400">Avg HR (bpm)</label><input type="number" id="manHR" placeholder="150"></div>
+      <div><label class="text-xs text-slate-400">Max HR (bpm)</label><input type="number" id="manMaxHR" placeholder="175"></div>
+      <div><label class="text-xs text-slate-400">Avg Cadence</label><input type="number" id="manCadence" placeholder="85"></div>
+      <div><label class="text-xs text-slate-400">Distance (km)</label><input type="number" id="manDistance" step="0.1" placeholder="25.0"></div>
+      <div><label class="text-xs text-slate-400">Elevation (m)</label><input type="number" id="manElevation" placeholder="150"></div>
+      <div><label class="text-xs text-slate-400">Calories</label><input type="number" id="manCalories" placeholder="650"></div>
+      <div><label class="text-xs text-slate-400">Max Power (W)</label><input type="number" id="manMaxPower" placeholder="800"></div>
+    </div>
+    <div class="mt-3">
+      <label class="text-xs text-slate-400">Route</label>
+      <select id="manRoute">
+        <option value="">Select route...</option>
+        <option value="tempus_fugit">Tempus Fugit</option>
+        <option value="flatland_loop">Flatland Loop</option>
+        <option value="hilly_reverse">Hilly Route Reverse</option>
+        <option value="beach_island">Beach Island Loop</option>
+        <option value="roule_ma_poule">Roule Ma Poule</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <button onclick="analyzeManual()" class="btn btn-orange w-full mt-3">Analyze</button>
+  </div>
+
+  <!-- Recent uploads -->
+  <div class="bg-card rounded-xl p-4 mt-4">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Recent Rides</h3>
+    <div id="recentRides" class="mt-2 space-y-2">
+      <p class="text-sm text-slate-500 italic">No rides yet</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ANALYSIS PAGE ===== -->
+<div id="pageAnalysis" class="page">
+  <div id="noAnalysis" class="text-center py-12 text-slate-500">
+    <div class="text-4xl mb-3">📊</div>
+    <p>Upload or enter ride data first</p>
+  </div>
+
+  <div id="analysisContent" class="hidden space-y-3">
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-3 gap-2">
+      <div class="bg-card rounded-xl p-3 text-center metric-card">
+        <div class="text-2xl font-bold text-orange-400" id="aSummaryNP">--</div>
+        <div class="text-xs text-slate-400">NP (W)</div>
+      </div>
+      <div class="bg-card rounded-xl p-3 text-center metric-card">
+        <div class="text-2xl font-bold text-blue-400" id="aSummaryTSS">--</div>
+        <div class="text-xs text-slate-400">TSS</div>
+      </div>
+      <div class="bg-card rounded-xl p-3 text-center metric-card">
+        <div class="text-2xl font-bold text-green-400" id="aSummaryIF">--</div>
+        <div class="text-xs text-slate-400">IF</div>
+      </div>
+    </div>
+
+    <!-- Detailed Metrics -->
+    <div class="bg-card rounded-xl p-4">
+      <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">Ride Metrics</h3>
+      <div class="grid grid-cols-2 gap-y-2 text-sm">
+        <div class="text-slate-400">Duration</div><div class="font-semibold text-right" id="aDuration">--</div>
+        <div class="text-slate-400">Distance</div><div class="font-semibold text-right" id="aDistance">--</div>
+        <div class="text-slate-400">Elevation</div><div class="font-semibold text-right" id="aElevation">--</div>
+        <div class="text-slate-400">Avg Power</div><div class="font-semibold text-right" id="aAvgPower">--</div>
+        <div class="text-slate-400">Normalized Power</div><div class="font-semibold text-right text-orange-400" id="aNP">--</div>
+        <div class="text-slate-400">W/kg (avg)</div><div class="font-semibold text-right" id="aWkg">--</div>
+        <div class="text-slate-400">Max Power</div><div class="font-semibold text-right" id="aMaxPower">--</div>
+        <div class="text-slate-400">Avg HR</div><div class="font-semibold text-right" id="aAvgHR">--</div>
+        <div class="text-slate-400">Max HR</div><div class="font-semibold text-right" id="aMaxHR">--</div>
+        <div class="text-slate-400">Avg Cadence</div><div class="font-semibold text-right" id="aAvgCad">--</div>
+        <div class="text-slate-400">Calories</div><div class="font-semibold text-right" id="aCalories">--</div>
+        <div class="text-slate-400">TSS</div><div class="font-semibold text-right text-blue-400" id="aTSS">--</div>
+        <div class="text-slate-400">IF</div><div class="font-semibold text-right text-green-400" id="aIF">--</div>
+        <div class="text-slate-400">VI</div><div class="font-semibold text-right" id="aVI">--</div>
+        <div class="text-slate-400">Efficiency Factor</div><div class="font-semibold text-right" id="aEF">--</div>
+      </div>
+    </div>
+
+    <!-- Power Zones -->
+    <div class="bg-card rounded-xl p-4">
+      <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">Power Zone Distribution</h3>
+      <div id="powerZones" class="space-y-2"></div>
+    </div>
+
+    <!-- HR Zones -->
+    <div class="bg-card rounded-xl p-4">
+      <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">HR Zone Distribution</h3>
+      <div id="hrZones" class="space-y-2"></div>
+    </div>
+
+    <!-- Power Chart -->
+    <div class="bg-card rounded-xl p-4">
+      <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Power & HR Over Time</h3>
+      <canvas id="rideChart" class="mt-2" height="200"></canvas>
+    </div>
+
+    <!-- Coach Analysis -->
+    <div class="bg-card rounded-xl p-4">
+      <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">🤖 Coach Analysis</h3>
+      <div id="coachAnalysis" class="space-y-2"></div>
+    </div>
+
+    <!-- Nutrition Breakdown -->
+    <div class="bg-card rounded-xl p-4">
+      <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">🍽️ Nutrition Recommendation</h3>
+      <div id="nutritionRec" class="space-y-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== WTRL TTT PAGE ===== -->
+<div id="pageWtrl" class="page">
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-3">Race Setup</h3>
+    <div class="space-y-3">
+      <div>
+        <label class="text-xs text-slate-400">Route</label>
+        <select id="wtrlRoute" onchange="updateWtrlRoute()">
+          <option value="tempus_fugit">Tempus Fugit (Watopia)</option>
+          <option value="flatland_loop">Flatland Loop (Makuri — Yumezi)</option>
+          <option value="hilly_reverse">Hilly Route Reverse (Watopia)</option>
+          <option value="beach_island">Beach Island Loop (Watopia)</option>
+          <option value="roule_ma_poule">Roule Ma Poule (France)</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-400">Laps</label><input type="number" id="wtrlLaps" value="2" min="1" max="10" onchange="updateWtrlRoute()"></div>
+        <div><label class="text-xs text-slate-400">Team Size</label><input type="number" id="wtrlTeamSize" value="7" min="2" max="8"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Route Info -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Route Profile</h3>
+    <div class="grid grid-cols-2 gap-y-2 text-sm">
+      <div class="text-slate-400">Distance</div><div class="font-semibold text-right" id="wrDist">--</div>
+      <div class="text-slate-400">Elevation</div><div class="font-semibold text-right" id="wrElev">--</div>
+      <div class="text-slate-400">Difficulty</div><div class="font-semibold text-right" id="wrDiff">--</div>
+      <div class="text-slate-400">Est. Time</div><div class="font-semibold text-right" id="wrTime">--</div>
+      <div class="text-slate-400">Est. Calories</div><div class="font-semibold text-right text-orange-400" id="wrCals">--</div>
+    </div>
+  </div>
+
+  <!-- Bike Recommendation -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">🚲 Bike Recommendation</h3>
+    <div id="bikeRec" class="space-y-2"></div>
+  </div>
+
+  <!-- Phase Breakdown -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">Race Phases</h3>
+    <div id="racePhases" class="space-y-2"></div>
+  </div>
+
+  <!-- Pacing Strategy -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">⚡ Pacing Strategy</h3>
+    <div id="pacingStrategy"></div>
+  </div>
+
+  <!-- Fueling Plan -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">🍽️ Fueling Protocol</h3>
+    <div id="fuelingPlan"></div>
+  </div>
+
+  <!-- Teammate Comparison -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider mb-2">👥 Team Power Profile</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead><tr class="text-slate-400 border-b border-slate-700">
+          <th class="text-left py-2">Rider</th><th class="text-right">W/kg</th><th class="text-right">CP</th><th class="text-right">Type</th>
+        </tr></thead>
+        <tbody>
+          <tr class="border-b border-slate-700/50"><td class="py-1.5">santo fu</td><td class="text-right font-bold text-green-400">3.69</td><td class="text-right">235W</td><td class="text-right"><span class="badge bg-green-500/20 text-green-400">Climber</span></td></tr>
+          <tr class="border-b border-slate-700/50"><td class="py-1.5">Like Stevanny</td><td class="text-right font-bold text-green-400">3.47</td><td class="text-right">210W</td><td class="text-right"><span class="badge bg-green-500/20 text-green-400">Climber</span></td></tr>
+          <tr class="border-b border-slate-700/50"><td class="py-1.5">Indra Jatnika</td><td class="text-right font-bold text-blue-400">3.29</td><td class="text-right">195W</td><td class="text-right"><span class="badge bg-blue-500/20 text-blue-400">Puncheur</span></td></tr>
+          <tr class="border-b border-slate-700/50"><td class="py-1.5">X AntoKeong</td><td class="text-right font-bold text-blue-400">3.15</td><td class="text-right">207W</td><td class="text-right"><span class="badge bg-blue-500/20 text-blue-400">Puncheur</span></td></tr>
+          <tr class="border-b border-slate-700/50"><td class="py-1.5">Andri Sugiarto</td><td class="text-right font-bold text-blue-400">2.95</td><td class="text-right">179W</td><td class="text-right"><span class="badge bg-blue-500/20 text-blue-400">Puncheur</span></td></tr>
+          <tr class="border-b border-slate-700/50"><td class="py-1.5">Agung B Laksono</td><td class="text-right font-bold text-amber-400">2.68</td><td class="text-right">183W</td><td class="text-right"><span class="badge bg-amber-500/20 text-amber-400">Sprinter</span></td></tr>
+          <tr class="bg-orange-500/10"><td class="py-1.5 font-bold">Stevi (you)</td><td class="text-right font-bold text-orange-400">2.66</td><td class="text-right">177W</td><td class="text-right"><span class="badge bg-orange-500/20 text-orange-400">Sprinter</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="mt-2 text-xs text-slate-500">Team avg (excl you): 3.21 W/kg · Your gap: -17%</div>
+  </div>
+</div>
+
+<!-- ===== HISTORY PAGE ===== -->
+<div id="pageHistory" class="page">
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Power Trend</h3>
+    <canvas id="historyPowerChart" class="mt-2" height="180"></canvas>
+  </div>
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider">TSS Trend</h3>
+    <canvas id="historyTSSChart" class="mt-2" height="150"></canvas>
+  </div>
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <h3 class="text-xs text-slate-400 font-semibold uppercase tracking-wider">All Rides</h3>
+    <div id="allRides" class="mt-2 space-y-2"></div>
+  </div>
+</div>
+</main>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="fixed inset-0 bg-black/60 z-50 flex items-end justify-center hidden">
+  <div class="bg-card rounded-t-2xl w-full max-h-[70vh] overflow-y-auto p-6" style="padding-bottom:calc(env(safe-area-inset-bottom) + 1.5rem)">
+    <h3 class="font-bold text-lg mb-4">⚙️ Athlete Settings</h3>
+    <div class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-400">FTP (W)</label><input type="number" id="setFTP" value="180"></div>
+        <div><label class="text-xs text-slate-400">Weight (kg)</label><input type="number" id="setWeight" value="79" step="0.1"></div>
+        <div><label class="text-xs text-slate-400">Max HR</label><input type="number" id="setMaxHR" value="185"></div>
+        <div><label class="text-xs text-slate-400">Resting HR</label><input type="number" id="setRestHR" value="44"></div>
+      </div>
+      <button onclick="saveSettings()" class="btn btn-orange w-full">Save</button>
+      <hr class="border-slate-600 my-2">
+      <div class="text-xs text-slate-400 mb-2">Data Management</div>
+      <button onclick="exportZwiftData()" class="btn btn-ghost w-full mb-2">Export Zwift Data</button>
+      <button onclick="document.getElementById('importZwift').click()" class="btn btn-ghost w-full mb-2">Import Backup</button>
+      <input type="file" id="importZwift" accept=".json" class="hidden" onchange="importZwiftData(this.files[0])">
+      <div class="text-xs text-green-400 mb-2">Data stored locally on your device only.</div>
+      <button onclick="document.getElementById('settingsModal').classList.add('hidden')" class="btn btn-ghost w-full">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== STORAGE & CONFIG ====================
+const DB={get(k,d=null){try{return JSON.parse(localStorage.getItem('zwift_'+k))||d}catch{return d}},set(k,v){localStorage.setItem('zwift_'+k,JSON.stringify(v))},push(k,i){const a=this.get(k,[]);a.push(i);this.set(k,a);return a}};
+
+let ATHLETE = DB.get('athlete', { ftp: 180, weight: 79, maxHR: 185, restHR: 44 });
+let currentRide = null;
+let charts = {};
+
+function getPowerZones(ftp) {
+  return [
+    { name:'Z1 Recovery', min:0, max:Math.round(ftp*0.55), color:'#94a3b8' },
+    { name:'Z2 Endurance', min:Math.round(ftp*0.56), max:Math.round(ftp*0.75), color:'#3b82f6' },
+    { name:'Z3 Tempo', min:Math.round(ftp*0.76), max:Math.round(ftp*0.90), color:'#22c55e' },
+    { name:'Z4 Threshold', min:Math.round(ftp*0.91), max:Math.round(ftp*1.05), color:'#f59e0b' },
+    { name:'Z5 VO2max', min:Math.round(ftp*1.06), max:Math.round(ftp*1.20), color:'#ef4444' },
+    { name:'Z6 Anaerobic', min:Math.round(ftp*1.21), max:Math.round(ftp*1.50), color:'#a855f7' },
+    { name:'Z7 Neuromuscular', min:Math.round(ftp*1.51), max:9999, color:'#ec4899' },
+  ];
+}
+
+function getHRZones(maxHR, restHR) {
+  const hrr = maxHR - restHR;
+  return [
+    { name:'Z1 Recovery', min:0, max:Math.round(restHR+hrr*0.5), color:'#94a3b8' },
+    { name:'Z2 Aerobic', min:Math.round(restHR+hrr*0.5), max:Math.round(restHR+hrr*0.6), color:'#3b82f6' },
+    { name:'Z3 Tempo', min:Math.round(restHR+hrr*0.6), max:Math.round(restHR+hrr*0.7), color:'#22c55e' },
+    { name:'Z4 Threshold', min:Math.round(restHR+hrr*0.7), max:Math.round(restHR+hrr*0.8), color:'#f59e0b' },
+    { name:'Z5 VO2max', min:Math.round(restHR+hrr*0.8), max:maxHR, color:'#ef4444' },
+  ];
+}
+
+// ==================== ROUTES DATABASE ====================
+const ROUTES = {
+  tempus_fugit: {
+    name: 'Tempus Fugit', world: 'Watopia', distPerLap: 17.3, elevPerLap: 24,
+    difficulty: 2, leadIn: 0, sprints: 1, koms: 0,
+    terrain: 'flat', aeroPercent: 95,
+    phases: [{ name:'Flat TT', km:'0–17.3', pct:'100%', terrain:'Dead flat', notes:'Pure aero, draft is everything' }],
+    bike: { frame:'CADEX Tri', wheels:'DT Swiss Disc (rear) + Zipp 858 (front)', why:'Flattest route in Zwift. 100% aero advantage.' },
+    estMinPerKm: 1.95
+  },
+  flatland_loop: {
+    name: 'Flatland Loop', world: 'Makuri Islands — Yumezi', distPerLap: 12.9, elevPerLap: 96,
+    difficulty: 6.3, leadIn: 0.2, sprints: 2, koms: 0,
+    terrain: 'rolling', aeroPercent: 61,
+    phases: [
+      { name:'Phase 1 — Flat', km:'0–5.5', pct:'42.6%', terrain:'Flat farmlands', notes:'Aero + draft dominant' },
+      { name:'Phase 2 — Climb', km:'5.5–10.5', pct:'38.8%', terrain:'Village → Summit', notes:'Avg 1.9% gradient' },
+      { name:'Phase 3 — Descent', km:'10.5–12.9', pct:'18.6%', terrain:'Castle to banner', notes:'Recovery, aero tuck' },
+    ],
+    bike: { frame:'CADEX Tri', wheels:'Max aero (disc rear)', why:'61% flat/descent = aero setup optimal. Climb is gentle enough.' },
+    estMinPerKm: 1.85
+  },
+  hilly_reverse: {
+    name: 'Hilly Route Reverse', world: 'Watopia', distPerLap: 9.4, elevPerLap: 108,
+    difficulty: 15, leadIn: 0, sprints: 1, koms: 1,
+    terrain: 'hilly', aeroPercent: 45,
+    phases: [
+      { name:'Rolling', km:'Varies', pct:'60%', terrain:'Constant gradient changes', notes:'Draft benefit limited' },
+      { name:'KOM', km:'2.49km', pct:'25%', terrain:'1.83% avg', notes:'Forces power surges' },
+      { name:'Descent + Sprint', km:'Final', pct:'15%', terrain:'Brief descent', notes:'Recovery limited' },
+    ],
+    bike: { frame:'CADEX Tri or Felt IA 2.0', wheels:'Balanced aero/weight — NOT full disc', why:'Too many gradient changes for full disc. Shiv was WRONG choice here.' },
+    estMinPerKm: 2.1
+  },
+  beach_island: {
+    name: 'Beach Island Loop', world: 'Watopia', distPerLap: 13.1, elevPerLap: 44,
+    difficulty: 5.8, leadIn: 0.2, sprints: 1, koms: 0,
+    terrain: 'flat', aeroPercent: 85,
+    phases: [
+      { name:'Phase 1 — Downtown', km:'0–1.5', pct:'11%', terrain:'Flat → slight rise', notes:'Small hill ~400m at 3%' },
+      { name:'Phase 2 — Volcano', km:'1.5–5.5', pct:'31%', terrain:'Flat around volcano', notes:'Pure aero, draft dominant' },
+      { name:'Phase 3 — Dirt', km:'5.5–7.5', pct:'15%', terrain:'Gradual dirt climb', notes:'DANGER ZONE — gaps open here' },
+      { name:'Phase 4 — Sprint + Bridge', km:'7.5–10.0', pct:'19%', terrain:'JWB Sprint then rollers', notes:'Recovery opportunity' },
+      { name:'Phase 5 — Ocean → Finish', km:'10.0–13.1', pct:'24%', terrain:'Ocean tube, climb out', notes:'1km climb back to surface' },
+    ],
+    bike: { frame:'CADEX Tri', wheels:'Max aero (full disc rear)', why:'85%+ flat. Only 44m climbing per lap. EXCELLENT for aero.' },
+    estMinPerKm: 1.9
+  },
+  roule_ma_poule: {
+    name: 'Roule Ma Poule', world: 'France', distPerLap: 22.89, elevPerLap: 155,
+    difficulty: 8, leadIn: 3.11, sprints: 2, koms: 1,
+    terrain: 'rolling', aeroPercent: 58,
+    phases: [
+      { name:'Lead-in Climb', km:'0–3.1', pct:'12%', terrain:'Petit KOM backside 3.4%', notes:'START HARD — sets race pace' },
+      { name:'Descent + Recovery', km:'3.1–5.5', pct:'9%', terrain:'Petit KOM descent', notes:'Regroup into TTTrain' },
+      { name:'Flat Cruise', km:'5.5–20.5', pct:'58%', terrain:'Flat French countryside', notes:'Aero dominant, 30-35% draft savings' },
+      { name:'Aqueduc KOM', km:'20.5–21.0', pct:'2%', terrain:'0.42 km, 0.9% grade', notes:'Barely a bump' },
+      { name:'Approach', km:'21.0–23.0', pct:'8%', terrain:'Flat past start pens', notes:'TAKE CARBS NOW' },
+      { name:'Final Climb', km:'23.0–26.1', pct:'12%', terrain:'Petit KOM 3.4% again', notes:'RACE DECIDER' },
+    ],
+    bike: { frame:'CADEX Tri', wheels:'DT Swiss Disc', why:'58% flat — aero dominant. 3.4% climbs are draftable and short enough.' },
+    estMinPerKm: 2.0
+  }
+};
+
+// ==================== FIT FILE PARSER ====================
+class FitParser {
+  constructor(buffer) {
+    this.view = new DataView(buffer);
+    this.offset = 0;
+    this.definitions = {};
+    this.records = [];
+    this.sessions = [];
+    this.laps = [];
+    this.littleEndian = true;
+  }
+
+  parse() {
+    this.parseHeader();
+    while (this.offset < this.view.byteLength - 2) {
+      try { this.parseRecord(); } catch(e) { break; }
+    }
+    return { records: this.records, sessions: this.sessions, laps: this.laps };
+  }
+
+  parseHeader() {
+    const headerSize = this.view.getUint8(0);
+    this.offset = headerSize;
+  }
+
+  parseRecord() {
+    const recordHeader = this.view.getUint8(this.offset++);
+    const isDefinition = (recordHeader & 0x40) !== 0;
+    const localMesgType = recordHeader & 0x0F;
+    const isCompressedTimestamp = (recordHeader & 0x80) !== 0;
+
+    if (isCompressedTimestamp) {
+      const localType = (recordHeader >> 5) & 0x03;
+      const def = this.definitions[localType];
+      if (def) this.readDataMessage(def);
+      return;
+    }
+
+    if (isDefinition) {
+      this.parseDefinition(localMesgType);
+    } else {
+      const def = this.definitions[localMesgType];
+      if (def) {
+        this.readDataMessage(def);
+      }
+    }
+  }
+
+  parseDefinition(localMesgType) {
+    this.offset++; // reserved
+    const arch = this.view.getUint8(this.offset++);
+    this.littleEndian = arch === 0;
+    const globalMesgNum = this.view.getUint16(this.offset, this.littleEndian); this.offset += 2;
+    const numFields = this.view.getUint8(this.offset++);
+    const fields = [];
+    for (let i = 0; i < numFields; i++) {
+      const fieldDefNum = this.view.getUint8(this.offset++);
+      const size = this.view.getUint8(this.offset++);
+      const baseType = this.view.getUint8(this.offset++);
+      fields.push({ fieldDefNum, size, baseType });
+    }
+    // Check for developer fields
+    if ((this.view.getUint8(this.offset - numFields * 3 - 5) & 0x20) !== 0) {
+      // skip developer fields definition if present
+    }
+    this.definitions[localMesgType] = { globalMesgNum, fields, arch };
+  }
+
+  readFieldValue(field) {
+    const le = this.littleEndian;
+    const bt = field.baseType & 0x1F;
+    let val;
+    try {
+      switch(bt) {
+        case 0: case 10: val = this.view.getUint8(this.offset); break; // enum, uint8z
+        case 1: val = this.view.getInt8(this.offset); break; // sint8
+        case 2: case 13: val = this.view.getUint8(this.offset); break; // uint8, byte
+        case 3: val = this.view.getInt16(this.offset, le); break; // sint16
+        case 4: case 11: val = this.view.getUint16(this.offset, le); break; // uint16, uint16z
+        case 5: val = this.view.getInt32(this.offset, le); break; // sint32
+        case 6: case 12: val = this.view.getUint32(this.offset, le); break; // uint32, uint32z
+        case 7: // string
+          val = '';
+          for (let i = 0; i < field.size; i++) {
+            const c = this.view.getUint8(this.offset + i);
+            if (c === 0) break;
+            val += String.fromCharCode(c);
+          }
+          break;
+        case 8: val = this.view.getFloat32(this.offset, le); break; // float32
+        case 9: val = this.view.getFloat64(this.offset, le); break; // float64
+        case 14: // sint64
+        case 15: // uint64
+          val = Number(this.view.getBigUint64(this.offset, le)); break;
+        default: val = this.view.getUint8(this.offset);
+      }
+    } catch(e) { val = null; }
+    this.offset += field.size;
+    return val;
+  }
+
+  readDataMessage(def) {
+    const data = {};
+    for (const field of def.fields) {
+      data[field.fieldDefNum] = this.readFieldValue(field);
+    }
+
+    if (def.globalMesgNum === 20) { // record
+      const rec = {};
+      if (data[7] !== undefined && data[7] !== 0xFFFF) rec.power = data[7];
+      if (data[3] !== undefined && data[3] !== 0xFF) rec.hr = data[3];
+      if (data[4] !== undefined && data[4] !== 0xFF) rec.cadence = data[4];
+      if (data[6] !== undefined && data[6] !== 0xFFFF) rec.speed = data[6] / 1000 * 3.6; // m/s to km/h
+      if (data[5] !== undefined) rec.distance = data[5] / 100000; // cm to km
+      if (data[2] !== undefined && data[2] !== 0xFFFF) rec.altitude = data[2] / 5 - 500;
+      if (data[253] !== undefined) rec.timestamp = data[253];
+      if (Object.keys(rec).length > 1) this.records.push(rec);
+    }
+
+    if (def.globalMesgNum === 18) { // session
+      this.sessions.push({
+        totalTime: data[7] ? data[7] / 1000 : null,
+        totalDist: data[9] ? data[9] / 100000 : null,
+        avgSpeed: data[14] ? data[14] / 1000 * 3.6 : null,
+        maxSpeed: data[15] ? data[15] / 1000 * 3.6 : null,
+        avgHR: data[16] !== 0xFF ? data[16] : null,
+        maxHR: data[17] !== 0xFF ? data[17] : null,
+        avgCadence: data[18] !== 0xFF ? data[18] : null,
+        avgPower: data[20] !== 0xFFFF ? data[20] : null,
+        maxPower: data[21] !== 0xFFFF ? data[21] : null,
+        totalAscent: data[22],
+        totalCalories: data[25],
+        np: data[34] !== 0xFFFF ? data[34] : null,
+      });
+    }
+
+    if (def.globalMesgNum === 19) { // lap
+      this.laps.push({
+        totalTime: data[7] ? data[7] / 1000 : null,
+        totalDist: data[9] ? data[9] / 100000 : null,
+        avgPower: data[20] !== 0xFFFF ? data[20] : null,
+        avgHR: data[16] !== 0xFF ? data[16] : null,
+        maxHR: data[17] !== 0xFF ? data[17] : null,
+      });
+    }
+  }
+}
+
+// ==================== FILE HANDLING ====================
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('dragover'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+  if (!file || !file.name.toLowerCase().endsWith('.fit')) {
+    showToast('Please select a .FIT file', 'error');
+    return;
+  }
+  const status = document.getElementById('uploadStatus');
+  status.classList.remove('hidden');
+  document.getElementById('uploadMsg').textContent = `Parsing ${file.name}...`;
+  document.getElementById('uploadDetail').textContent = `${(file.size/1024).toFixed(0)} KB`;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const parser = new FitParser(e.target.result);
+      const result = parser.parse();
+      document.getElementById('uploadMsg').textContent = `✅ Parsed: ${result.records.length} data points`;
+      document.getElementById('uploadSpinner').textContent = '✅';
+      processRide(result, file.name);
+    } catch(err) {
+      document.getElementById('uploadMsg').textContent = '❌ Parse error — try manual entry';
+      document.getElementById('uploadSpinner').textContent = '❌';
+      document.getElementById('uploadDetail').textContent = err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function processRide(fitData, fileName) {
+  const records = fitData.records;
+  const session = fitData.sessions[0] || {};
+
+  const powers = records.filter(r => r.power && r.power > 0 && r.power < 2500).map(r => r.power);
+  const hrs = records.filter(r => r.hr && r.hr > 30 && r.hr < 250).map(r => r.hr);
+  const cadences = records.filter(r => r.cadence && r.cadence > 0).map(r => r.cadence);
+
+  const avgPower = powers.length ? Math.round(powers.reduce((s,v) => s+v, 0) / powers.length) : session.avgPower;
+  const maxPower = powers.length ? Math.max(...powers) : session.maxPower;
+  const avgHR = hrs.length ? Math.round(hrs.reduce((s,v) => s+v, 0) / hrs.length) : session.avgHR;
+  const maxHR = hrs.length ? Math.max(...hrs) : session.maxHR;
+  const avgCad = cadences.length ? Math.round(cadences.reduce((s,v) => s+v, 0) / cadences.length) : session.avgCadence;
+
+  // Calculate NP
+  let np = session.np;
+  if (!np && powers.length >= 30) {
+    const windowSize = 30;
+    const rolling = [];
+    for (let i = windowSize - 1; i < powers.length; i++) {
+      let sum = 0;
+      for (let j = i - windowSize + 1; j <= i; j++) sum += powers[j];
+      rolling.push(Math.pow(sum / windowSize, 4));
+    }
+    np = Math.round(Math.pow(rolling.reduce((s,v) => s+v, 0) / rolling.length, 0.25));
+  }
+  if (!np) np = avgPower ? Math.round(avgPower * 1.05) : null;
+
+  const duration = session.totalTime || (records.length);
+  const distance = session.totalDist || (records.length > 0 && records[records.length-1].distance ? records[records.length-1].distance : null);
+  const elevation = session.totalAscent || 0;
+  const calories = session.totalCalories || (avgPower ? Math.round(avgPower * (duration / 3600) * 3.6) : null);
+
+  const ftp = ATHLETE.ftp;
+  const IF_val = np ? (np / ftp) : null;
+  const TSS = (np && duration) ? Math.round((duration * np * IF_val) / (ftp * 3600) * 100) : null;
+  const VI = (np && avgPower) ? (np / avgPower).toFixed(3) : null;
+  const EF = (np && avgHR) ? (np / avgHR).toFixed(2) : null;
+  const wkg = avgPower ? (avgPower / ATHLETE.weight).toFixed(2) : null;
+
+  currentRide = {
+    date: new Date().toISOString().slice(0,10), fileName,
+    duration, distance, elevation, calories,
+    avgPower, maxPower, np, avgHR, maxHR, avgCad,
+    IF: IF_val, TSS, VI, EF, wkg,
+    powerData: powers, hrData: hrs, cadenceData: cadences,
+  };
+
+  DB.push('rides', {
+    date: currentRide.date, fileName, duration, distance, elevation,
+    avgPower, np, TSS, IF: IF_val, avgHR, maxHR, avgCad, calories, wkg
+  });
+
+  showPage('analysis', document.querySelectorAll('.tab-btn')[1]);
+  renderAnalysis();
+  renderRecentRides();
+  showToast('Ride analyzed!', 'success');
+}
+
+// ==================== MANUAL ENTRY ====================
+function analyzeManual() {
+  const avgPower = parseInt(document.getElementById('manPower').value);
+  const np = parseInt(document.getElementById('manNP').value) || (avgPower ? Math.round(avgPower * 1.05) : null);
+  const duration = (parseInt(document.getElementById('manDuration').value) || 45) * 60;
+  const ftp = ATHLETE.ftp;
+  const IF_val = np ? np / ftp : null;
+  const TSS = (np && IF_val) ? Math.round((duration * np * IF_val) / (ftp * 3600) * 100) : null;
+
+  currentRide = {
+    date: new Date().toISOString().slice(0,10), fileName: 'Manual Entry',
+    duration, distance: parseFloat(document.getElementById('manDistance').value) || null,
+    elevation: parseInt(document.getElementById('manElevation').value) || 0,
+    calories: parseInt(document.getElementById('manCalories').value) || (avgPower ? Math.round(avgPower * (duration/3600) * 3.6) : null),
+    avgPower, maxPower: parseInt(document.getElementById('manMaxPower').value) || null,
+    np, avgHR: parseInt(document.getElementById('manHR').value) || null,
+    maxHR: parseInt(document.getElementById('manMaxHR').value) || null,
+    avgCad: parseInt(document.getElementById('manCadence').value) || null,
+    IF: IF_val, TSS, VI: (np && avgPower) ? (np/avgPower).toFixed(3) : null,
+    EF: (np && parseInt(document.getElementById('manHR').value)) ? (np/parseInt(document.getElementById('manHR').value)).toFixed(2) : null,
+    wkg: avgPower ? (avgPower / ATHLETE.weight).toFixed(2) : null,
+    powerData: [], hrData: [], cadenceData: [],
+  };
+
+  DB.push('rides', {
+    date: currentRide.date, fileName: 'Manual', duration, distance: currentRide.distance,
+    elevation: currentRide.elevation, avgPower, np, TSS, IF: IF_val,
+    avgHR: currentRide.avgHR, maxHR: currentRide.maxHR, avgCad: currentRide.avgCad,
+    calories: currentRide.calories, wkg: currentRide.wkg
+  });
+
+  showPage('analysis', document.querySelectorAll('.tab-btn')[1]);
+  renderAnalysis();
+  renderRecentRides();
+  showToast('Ride analyzed!', 'success');
+}
+
+// ==================== RENDER ANALYSIS ====================
+function renderAnalysis() {
+  if (!currentRide) return;
+  document.getElementById('noAnalysis').classList.add('hidden');
+  document.getElementById('analysisContent').classList.remove('hidden');
+  const r = currentRide;
+
+  document.getElementById('aSummaryNP').textContent = r.np || '--';
+  document.getElementById('aSummaryTSS').textContent = r.TSS || '--';
+  document.getElementById('aSummaryIF').textContent = r.IF ? r.IF.toFixed(2) : '--';
+
+  const fmt = (s) => s ? `${Math.floor(s/3600)}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}` : '--';
+  document.getElementById('aDuration').textContent = fmt(r.duration);
+  document.getElementById('aDistance').textContent = r.distance ? r.distance.toFixed(1) + ' km' : '--';
+  document.getElementById('aElevation').textContent = r.elevation ? r.elevation + ' m' : '--';
+  document.getElementById('aAvgPower').textContent = r.avgPower ? r.avgPower + ' W' : '--';
+  document.getElementById('aNP').textContent = r.np ? r.np + ' W' : '--';
+  document.getElementById('aWkg').textContent = r.wkg ? r.wkg + ' W/kg' : '--';
+  document.getElementById('aMaxPower').textContent = r.maxPower ? r.maxPower + ' W' : '--';
+  document.getElementById('aAvgHR').textContent = r.avgHR ? r.avgHR + ' bpm' : '--';
+  document.getElementById('aMaxHR').textContent = r.maxHR ? r.maxHR + ' bpm' : '--';
+  document.getElementById('aAvgCad').textContent = r.avgCad ? r.avgCad + ' rpm' : '--';
+  document.getElementById('aCalories').textContent = r.calories ? r.calories + ' kcal' : '--';
+  document.getElementById('aTSS').textContent = r.TSS || '--';
+  document.getElementById('aIF').textContent = r.IF ? r.IF.toFixed(2) : '--';
+  document.getElementById('aVI').textContent = r.VI || '--';
+  document.getElementById('aEF').textContent = r.EF || '--';
+
+  renderPowerZones(r);
+  renderHRZones(r);
+  renderRideChart(r);
+  renderCoachAnalysis(r);
+  renderNutritionRec(r);
+}
+
+function renderPowerZones(r) {
+  const el = document.getElementById('powerZones');
+  if (!r.powerData.length && !r.avgPower) { el.innerHTML='<p class="text-xs text-slate-500">No power data</p>'; return; }
+  const zones = getPowerZones(ATHLETE.ftp);
+  const data = r.powerData.length ? r.powerData : [r.avgPower];
+  const total = data.length;
+  el.innerHTML = zones.map(z => {
+    const count = data.filter(p => p >= z.min && p <= z.max).length;
+    const pct = Math.round(count / total * 100);
+    return `<div><div class="flex justify-between text-xs mb-1"><span class="text-slate-400">${z.name}</span><span class="font-semibold">${pct}%</span></div>
+      <div class="w-full bg-slate-700 rounded-full h-2"><div class="zone-bar" style="width:${pct}%;background:${z.color}"></div></div></div>`;
+  }).join('');
+}
+
+function renderHRZones(r) {
+  const el = document.getElementById('hrZones');
+  if (!r.hrData.length && !r.avgHR) { el.innerHTML='<p class="text-xs text-slate-500">No HR data</p>'; return; }
+  const zones = getHRZones(ATHLETE.maxHR, ATHLETE.restHR);
+  const data = r.hrData.length ? r.hrData : [r.avgHR];
+  const total = data.length;
+  el.innerHTML = zones.map(z => {
+    const count = data.filter(h => h >= z.min && h < z.max).length;
+    const pct = Math.round(count / total * 100);
+    return `<div><div class="flex justify-between text-xs mb-1"><span class="text-slate-400">${z.name}</span><span class="font-semibold">${pct}%</span></div>
+      <div class="w-full bg-slate-700 rounded-full h-2"><div class="zone-bar" style="width:${pct}%;background:${z.color}"></div></div></div>`;
+  }).join('');
+}
+
+function renderRideChart(r) {
+  if (charts.ride) charts.ride.destroy();
+  const ctx = document.getElementById('rideChart');
+  if (!r.powerData.length) return;
+
+  const step = Math.max(1, Math.floor(r.powerData.length / 300));
+  const pSampled = r.powerData.filter((_,i) => i % step === 0);
+  const hSampled = r.hrData.filter((_,i) => i % step === 0);
+  const labels = pSampled.map((_,i) => {
+    const sec = i * step;
+    return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;
+  });
+
+  charts.ride = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label:'Power', data:pSampled, borderColor:'#f97316', borderWidth:1, fill:true, backgroundColor:'rgba(249,115,22,0.1)', tension:0.1, pointRadius:0, yAxisID:'y' },
+        { label:'HR', data:hSampled, borderColor:'#ef4444', borderWidth:1, fill:false, tension:0.3, pointRadius:0, yAxisID:'y1' }
+      ]
+    },
+    options: { responsive:true, interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#94a3b8',font:{size:10}}}},
+      scales:{
+        x:{display:false},
+        y:{position:'left',ticks:{color:'#f97316',font:{size:9}},grid:{color:'#1e293b'},title:{display:true,text:'Watts',color:'#f97316',font:{size:9}}},
+        y1:{position:'right',ticks:{color:'#ef4444',font:{size:9}},grid:{display:false},title:{display:true,text:'BPM',color:'#ef4444',font:{size:9}}}
+      }
+    }
+  });
+}
+
+function renderCoachAnalysis(r) {
+  const insights = [];
+  const ftp = ATHLETE.ftp;
+
+  if (r.IF) {
+    if (r.IF > 1.0) insights.push({t:'danger',i:'🔴',title:'Very High Intensity',msg:`IF ${r.IF.toFixed(2)} > 1.0 — this is above FTP pace. Only sustainable for <1hr. Review if FTP needs updating.`});
+    else if (r.IF > 0.85) insights.push({t:'warn',i:'⚡',title:'Threshold Effort',msg:`IF ${r.IF.toFixed(2)} — solid threshold ride. Good for TTT racing but ensure adequate recovery (48hrs).`});
+    else if (r.IF > 0.7) insights.push({t:'info',i:'✅',title:'Tempo/Sweet Spot',msg:`IF ${r.IF.toFixed(2)} — good training intensity. This builds FTP without excessive fatigue.`});
+    else insights.push({t:'success',i:'💚',title:'Endurance Ride',msg:`IF ${r.IF.toFixed(2)} — perfect for aerobic base building and fat oxidation at ${ATHLETE.weight}kg.`});
+  }
+
+  if (r.VI && parseFloat(r.VI) > 1.1) {
+    insights.push({t:'warn',i:'📊',title:`High Variability (VI: ${r.VI})`,msg:'VI > 1.10 means surging power. Work on smoother pacing — consistent power = faster in TTT.'});
+  }
+
+  if (r.TSS) {
+    const recoveryHrs = r.TSS < 150 ? 24 : r.TSS < 300 ? 48 : 72;
+    insights.push({t:'info',i:'⏰',title:`Recovery: ${recoveryHrs}hrs`,msg:`TSS ${r.TSS} — ${r.TSS < 100 ? 'low stress, can train tomorrow' : r.TSS < 200 ? 'moderate, legs may be tired tomorrow' : 'high stress, full recovery needed'}.`});
+  }
+
+  if (r.wkg) {
+    const gap = (3.21 - parseFloat(r.wkg)).toFixed(2);
+    if (parseFloat(r.wkg) < 3.21) {
+      insights.push({t:'info',i:'👥',title:`Team Gap: ${gap} W/kg`,msg:`Your ${r.wkg} W/kg vs team avg 3.21 W/kg. Focus on drafting. Losing weight (${ATHLETE.weight}→75kg) would close gap by ~0.15 W/kg.`});
+    }
+  }
+
+  if (r.EF) {
+    insights.push({t:'info',i:'❤️',title:`Efficiency Factor: ${r.EF}`,msg:`EF = NP/AvgHR. Track this over time — rising EF at same power = improving aerobic fitness.`});
+  }
+
+  const colors = {success:'border-green-500 bg-green-500/5',warn:'border-amber-500 bg-amber-500/5',danger:'border-red-500 bg-red-500/5',info:'border-blue-500 bg-blue-500/5'};
+  document.getElementById('coachAnalysis').innerHTML = insights.map(i =>
+    `<div class="coach-card ${colors[i.t]}"><div class="font-semibold text-sm">${i.i} ${i.title}</div><div class="text-xs text-slate-300 mt-1">${i.msg}</div></div>`
+  ).join('');
+}
+
+function renderNutritionRec(r) {
+  if (!r.duration || !r.avgPower) { document.getElementById('nutritionRec').innerHTML='<p class="text-xs text-slate-500">Need power and duration data</p>'; return; }
+  const durationMin = r.duration / 60;
+  const calories = r.calories || Math.round(r.avgPower * (r.duration/3600) * 3.6);
+  const carbsPerHour = durationMin > 90 ? 80 : durationMin > 60 ? 60 : 30;
+  const totalCarbs = Math.round(carbsPerHour * (durationMin / 60));
+  const waterMl = Math.round(durationMin * 12);
+  const sodiumMg = Math.round(durationMin * 8);
+
+  document.getElementById('nutritionRec').innerHTML = `
+    <div class="grid grid-cols-2 gap-y-2 text-sm">
+      <div class="text-slate-400">Calories Burned</div><div class="font-semibold text-right text-orange-400">${calories} kcal</div>
+      <div class="text-slate-400">Carb Target</div><div class="font-semibold text-right">${totalCarbs}g (${carbsPerHour}g/hr)</div>
+      <div class="text-slate-400">Hydration</div><div class="font-semibold text-right">${waterMl} ml</div>
+      <div class="text-slate-400">Sodium</div><div class="font-semibold text-right">${sodiumMg} mg</div>
+    </div>
+    <div class="mt-3 space-y-2">
+      <div class="coach-card border-blue-500 bg-blue-500/5">
+        <div class="font-semibold text-xs">🕐 Pre-ride (2hr before)</div>
+        <div class="text-xs text-slate-300">${Math.round(calories*0.5)}kcal: oatmeal + banana + coffee. Carb-rich, low fiber.</div>
+      </div>
+      ${durationMin > 45 ? `<div class="coach-card border-amber-500 bg-amber-500/5">
+        <div class="font-semibold text-xs">🚴 During ride</div>
+        <div class="text-xs text-slate-300">${carbsPerHour}g carb/hr: ${Math.ceil(durationMin/30)} gel(s) OR ${Math.round(waterMl/750)} bottles isotonic drink. Sip every 15min.</div>
+      </div>` : ''}
+      <div class="coach-card border-green-500 bg-green-500/5">
+        <div class="font-semibold text-xs">🍽️ Post-ride (within 30min)</div>
+        <div class="text-xs text-slate-300">${Math.round(ATHLETE.weight*0.4)}g protein + ${Math.round(totalCarbs*0.5)}g carbs. Whey shake + rice/bread. Then full meal within 2hrs.</div>
+      </div>
+    </div>`;
+}
+
+// ==================== WTRL TTT PAGE ====================
+function updateWtrlRoute() {
+  const key = document.getElementById('wtrlRoute').value;
+  const laps = parseInt(document.getElementById('wtrlLaps').value) || 2;
+  const route = ROUTES[key];
+  if (!route) return;
+
+  const totalDist = route.distPerLap * laps + route.leadIn;
+  const totalElev = route.elevPerLap * laps + (route.leadIn > 0 ? 108 : 0);
+  const estMinutes = Math.round(totalDist * route.estMinPerKm);
+  const estCalories = Math.round(ATHLETE.ftp * 0.85 * (estMinutes/60) * 3.6);
+
+  document.getElementById('wrDist').textContent = totalDist.toFixed(1) + ' km';
+  document.getElementById('wrElev').textContent = totalElev + ' m';
+  document.getElementById('wrDiff').textContent = route.difficulty + ' / 100';
+  document.getElementById('wrTime').textContent = `~${estMinutes} min`;
+  document.getElementById('wrCals').textContent = estCalories + ' kcal';
+
+  // Bike
+  document.getElementById('bikeRec').innerHTML = `
+    <div class="bg-slate-700/30 rounded-lg p-3">
+      <div class="flex items-center gap-2 mb-1"><span class="text-xl">🚲</span><span class="font-bold text-sm">${route.bike.frame}</span></div>
+      <div class="text-xs text-blue-400">Wheels: ${route.bike.wheels}</div>
+      <div class="text-xs text-slate-400 mt-1">${route.bike.why}</div>
+      <div class="text-xs text-slate-500 mt-1">Aero advantage: ${route.aeroPercent}% of route favors aero setup</div>
+    </div>`;
+
+  // Phases
+  document.getElementById('racePhases').innerHTML = route.phases.map((p,i) => `
+    <div class="bg-slate-700/30 rounded-lg p-2">
+      <div class="flex justify-between items-center"><span class="font-semibold text-xs">${p.name}</span><span class="text-xs text-slate-400">${p.km} km (${p.pct})</span></div>
+      <div class="text-xs text-slate-400 mt-0.5">${p.terrain}</div>
+      <div class="text-xs text-orange-400 mt-0.5">${p.notes}</div>
+    </div>`).join('');
+
+  // Pacing
+  const ftpTarget = Math.round(ATHLETE.ftp * 0.85);
+  const climbTarget = Math.round(ATHLETE.ftp * 0.95);
+  const flatTarget = Math.round(ATHLETE.ftp * 0.80);
+  document.getElementById('pacingStrategy').innerHTML = `
+    <div class="grid grid-cols-2 gap-y-2 text-sm mb-3">
+      <div class="text-slate-400">Target Avg Power</div><div class="font-semibold text-right text-orange-400">${ftpTarget}W (${(ftpTarget/ATHLETE.weight).toFixed(2)} W/kg)</div>
+      <div class="text-slate-400">Flat Sections</div><div class="font-semibold text-right">${flatTarget}W — stay in draft</div>
+      <div class="text-slate-400">Climb Sections</div><div class="font-semibold text-right">${climbTarget}W — match team pace</div>
+      <div class="text-slate-400">Target HR</div><div class="font-semibold text-right">${Math.round(ATHLETE.restHR + (ATHLETE.maxHR-ATHLETE.restHR)*0.78)} bpm (Z4 ceiling)</div>
+    </div>
+    <div class="coach-card border-orange-500 bg-orange-500/5">
+      <div class="font-semibold text-xs">🎯 TTT Role: Pure Drafter</div>
+      <div class="text-xs text-slate-300">At 2.28 W/kg (team lowest), maximize draft savings. Stay 2nd-3rd wheel. Only pull on flat if fresh. Never pull on climbs.</div>
+    </div>
+    <div class="coach-card border-amber-500 bg-amber-500/5 mt-2">
+      <div class="font-semibold text-xs">⚠️ Climb Survival</div>
+      <div class="text-xs text-slate-300">On ${route.terrain === 'hilly' ? 'significant' : 'gentle'} climbs, stick to ${climbTarget}W max. If team surges above this, let gap open then close on descent. Communicate!</div>
+    </div>`;
+
+  // Fueling
+  const preMeal = Math.round(estCalories * 0.5);
+  const duringCarbs = estMinutes > 45 ? Math.round(estMinutes * 1.0) : 0;
+  const duringGels = Math.ceil(duringCarbs / 25);
+  const waterMl = Math.round(estMinutes * 12);
+  document.getElementById('fuelingPlan').innerHTML = `
+    <div class="space-y-2">
+      <div class="coach-card border-blue-500 bg-blue-500/5">
+        <div class="font-semibold text-xs">🕐 2 Hours Before Race</div>
+        <div class="text-xs text-slate-300">${preMeal}kcal — Oatmeal (80g) + banana + honey + coffee (200mg caffeine). Low fiber, high carb.</div>
+      </div>
+      <div class="coach-card border-amber-500 bg-amber-500/5">
+        <div class="font-semibold text-xs">⏰ 15 Min Before Start</div>
+        <div class="text-xs text-slate-300">1 gel (25g carbs) + 200ml water. Caffeine gel if not in coffee.</div>
+      </div>
+      ${estMinutes > 45 ? `<div class="coach-card border-orange-500 bg-orange-500/5">
+        <div class="font-semibold text-xs">🚴 During Race (~${estMinutes} min)</div>
+        <div class="text-xs text-slate-300">${duringCarbs}g carbs total: ${duringGels} gel(s) spaced every ${Math.round(estMinutes/duringGels)} min. ${waterMl}ml fluid. Electrolyte drink preferred.</div>
+      </div>` : '<div class="text-xs text-slate-500">Race under 45min — water only during, no gels needed.</div>'}
+      <div class="coach-card border-green-500 bg-green-500/5">
+        <div class="font-semibold text-xs">🍽️ Post-Race (within 30 min)</div>
+        <div class="text-xs text-slate-300">${Math.round(ATHLETE.weight*0.4)}g protein whey + ${Math.round(duringCarbs*0.7)}g carbs (rice/bread). Full meal within 2hrs: ${Math.round(estCalories * 0.6)}kcal.</div>
+      </div>
+    </div>`;
+}
+
+// ==================== HISTORY ====================
+function renderRecentRides() {
+  const rides = DB.get('rides', []).slice(-10).reverse();
+  document.getElementById('recentRides').innerHTML = rides.length ? rides.map(r => `
+    <div class="bg-slate-700/30 rounded-lg p-2 metric-card" onclick="loadRideFromHistory(${rides.indexOf(r)})">
+      <div class="flex justify-between items-center">
+        <span class="font-semibold text-sm">${r.fileName || 'Ride'}</span>
+        <span class="text-xs text-slate-400">${r.date}</span>
+      </div>
+      <div class="text-xs text-slate-400 mt-0.5">
+        ${r.avgPower ? r.avgPower+'W avg' : ''} ${r.np ? '| NP '+r.np+'W' : ''} ${r.TSS ? '| TSS '+r.TSS : ''} ${r.distance ? '| '+r.distance.toFixed(1)+'km' : ''}
+      </div>
+    </div>`).join('') : '<p class="text-sm text-slate-500 italic">No rides yet</p>';
+}
+
+function renderHistory() {
+  const rides = DB.get('rides', []);
+  if (!rides.length) return;
+
+  // Power trend
+  if (charts.histPower) charts.histPower.destroy();
+  const ctx1 = document.getElementById('historyPowerChart');
+  charts.histPower = new Chart(ctx1, {
+    type: 'line',
+    data: {
+      labels: rides.map(r => r.date.slice(5)),
+      datasets: [
+        { label:'Avg Power', data:rides.map(r=>r.avgPower), borderColor:'#f97316', borderWidth:2, tension:0.3, pointRadius:3 },
+        { label:'NP', data:rides.map(r=>r.np), borderColor:'#3b82f6', borderWidth:2, tension:0.3, pointRadius:3 },
+        { label:'FTP', data:rides.map(()=>ATHLETE.ftp), borderColor:'#22c55e', borderWidth:1, borderDash:[5,5], pointRadius:0 },
+      ]
+    },
+    options:{responsive:true,plugins:{legend:{labels:{color:'#94a3b8',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#64748b',font:{size:9}},grid:{display:false}},y:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'#1e293b'}}}}
+  });
+
+  // TSS trend
+  if (charts.histTSS) charts.histTSS.destroy();
+  const ctx2 = document.getElementById('historyTSSChart');
+  charts.histTSS = new Chart(ctx2, {
+    type: 'bar',
+    data: { labels: rides.map(r=>r.date.slice(5)), datasets: [{ label:'TSS', data:rides.map(r=>r.TSS||0), backgroundColor:'#3b82f6' }] },
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#64748b',font:{size:9}},grid:{display:false}},y:{ticks:{color:'#64748b',font:{size:10}},grid:{color:'#1e293b'}}}}
+  });
+
+  // All rides list
+  document.getElementById('allRides').innerHTML = rides.slice().reverse().map(r => `
+    <div class="bg-slate-700/30 rounded-lg p-2">
+      <div class="flex justify-between"><span class="font-semibold text-sm">${r.fileName||'Ride'}</span><span class="text-xs text-slate-400">${r.date}</span></div>
+      <div class="grid grid-cols-4 gap-1 mt-1 text-xs text-slate-400">
+        <div>${r.avgPower||'--'}W avg</div><div>NP ${r.np||'--'}W</div><div>TSS ${r.TSS||'--'}</div><div>${r.wkg||'--'} W/kg</div>
+      </div>
+    </div>`).join('');
+}
+
+// ==================== NAV & UTILS ====================
+function showPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (name === 'wtrl') updateWtrlRoute();
+  if (name === 'history') renderHistory();
+}
+
+function showSettings() { document.getElementById('settingsModal').classList.remove('hidden');
+  document.getElementById('setFTP').value = ATHLETE.ftp;
+  document.getElementById('setWeight').value = ATHLETE.weight;
+  document.getElementById('setMaxHR').value = ATHLETE.maxHR;
+  document.getElementById('setRestHR').value = ATHLETE.restHR;
+}
+function saveSettings() {
+  ATHLETE = { ftp: parseInt(document.getElementById('setFTP').value), weight: parseFloat(document.getElementById('setWeight').value),
+    maxHR: parseInt(document.getElementById('setMaxHR').value), restHR: parseInt(document.getElementById('setRestHR').value) };
+  DB.set('athlete', ATHLETE);
+  document.getElementById('settingsModal').classList.add('hidden');
+  document.getElementById('headerFTP').textContent = ATHLETE.ftp;
+  document.getElementById('headerWkg').textContent = (ATHLETE.ftp/ATHLETE.weight).toFixed(2);
+  document.getElementById('headerWeight').textContent = ATHLETE.weight;
+  showToast('Settings saved!');
+}
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast ${type==='success'?'bg-green-600':type==='error'?'bg-red-600':'bg-blue-600'}`;
+  t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 2500);
+}
+
+function exportZwiftData() {
+  const data = {};
+  Object.keys(localStorage).filter(k => k.startsWith('zwift_')).forEach(k => {
+    data[k.replace('zwift_', '')] = JSON.parse(localStorage.getItem(k));
+  });
+  const blob = new Blob([JSON.stringify({ _version: 2, _date: new Date().toISOString(), zwift: data }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `stevi-zwift-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  showToast('Zwift data exported!');
+}
+function importZwiftData(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+      const zwiftData = imported._version === 2 ? imported.zwift : imported;
+      if (zwiftData) Object.entries(zwiftData).forEach(([k,v]) => { if (!k.startsWith('_')) localStorage.setItem('zwift_' + k, JSON.stringify(v)); });
+      location.reload();
+    } catch(err) { showToast('Invalid backup file', 'error'); }
+  };
+  reader.readAsText(file);
+}
+
+// Init
+document.getElementById('headerFTP').textContent = ATHLETE.ftp;
+document.getElementById('headerWkg').textContent = (ATHLETE.ftp/ATHLETE.weight).toFixed(2);
+document.getElementById('headerWeight').textContent = ATHLETE.weight;
+renderRecentRides();
+</script>
+</body>
+</html>
