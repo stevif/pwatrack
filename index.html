@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.json">
+<title>Stevi Tennis Performance</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+tailwind.config={theme:{extend:{colors:{dark:'#0f172a',card:'#1e293b',cardHover:'#334155',accent:'#3b82f6',tennis:'#22c55e',warn:'#f59e0b',danger:'#ef4444'}}}}
+</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+*{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:#0f172a;color:#f8fafc;overscroll-behavior:none;padding-bottom:env(safe-area-inset-bottom)}
+.page{display:none;animation:fadeIn .2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.glass{background:rgba(30,41,59,.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.metric-card{transition:transform .15s ease}
+.metric-card:active{transform:scale(.97)}
+input[type="number"],input[type="text"],input[type="date"],select,textarea{background:#334155;border:1px solid #475569;color:#f8fafc;border-radius:.5rem;padding:.5rem .75rem;width:100%;font-size:16px}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 2px rgba(59,130,246,.3)}
+.btn{padding:.5rem 1rem;border-radius:.5rem;font-weight:600;font-size:.875rem;transition:all .15s;cursor:pointer;border:none}
+.btn:active{transform:scale(.95)}
+.btn-primary{background:#3b82f6;color:white}
+.btn-success{background:#22c55e;color:white}
+.btn-danger{background:#ef4444;color:white}
+.btn-ghost{background:transparent;color:#94a3b8;border:1px solid #475569}
+.tab-btn{flex:1;padding:.5rem;text-align:center;border-radius:.5rem;font-size:.75rem;font-weight:600;transition:all .15s}
+.tab-btn.active{background:#3b82f6;color:white}
+.progress-ring{transform:rotate(-90deg)}
+.badge{display:inline-block;padding:2px 8px;border-radius:9999px;font-size:.7rem;font-weight:600}
+::-webkit-scrollbar{width:0}
+.safe-top{padding-top:max(env(safe-area-inset-top),20px)}
+.safe-bottom{padding-bottom:max(calc(env(safe-area-inset-bottom) + 70px),90px)}
+.counter-btn{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.25rem;font-weight:700;border:none;cursor:pointer;transition:transform .1s}
+.counter-btn:active{transform:scale(.9)}
+.slide-up{animation:slideUp .3s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:flex;align-items:flex-end;justify-content:center}
+.modal-content{background:#1e293b;border-radius:1rem 1rem 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:1.5rem;padding-bottom:calc(env(safe-area-inset-bottom) + 1.5rem)}
+.toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);padding:.75rem 1.5rem;border-radius:.75rem;font-size:.875rem;font-weight:600;z-index:100;animation:toastIn .3s ease}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.ripple{position:relative;overflow:hidden}
+.coach-card{border-left:3px solid;padding:.75rem 1rem;border-radius:0 .5rem .5rem 0;margin-bottom:.75rem}
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- ==================== TOP BAR ==================== -->
+<header class="glass fixed top-0 left-0 right-0 z-40 safe-top px-4 pb-2">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-lg font-bold">🎾 Stevi</h1>
+      <p class="text-xs text-slate-400" id="topDate"></p>
+    </div>
+    <div class="flex items-center gap-3">
+      <div id="readinessIndicator" class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer" onclick="showReadinessModal()">--</div>
+      <button onclick="showSettingsModal()" class="text-slate-400 text-xl">⚙️</button>
+    </div>
+  </div>
+</header>
+
+<!-- ==================== PAGES ==================== -->
+<main class="pt-20 px-4 safe-bottom">
+
+<!-- ===== DASHBOARD ===== -->
+<div id="pageDashboard" class="page active">
+  <!-- Weight Progress -->
+  <div class="bg-card rounded-xl p-4 mb-3 metric-card">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Weight Journey</span>
+      <span class="text-xs text-tennis font-bold" id="weightDelta"></span>
+    </div>
+    <div class="flex items-end gap-3 mb-2">
+      <span class="text-3xl font-extrabold" id="currentWeight">80.0</span>
+      <span class="text-sm text-slate-400">kg</span>
+      <span class="text-slate-500 mx-1">→</span>
+      <span class="text-lg font-bold text-tennis">75.0 kg</span>
+    </div>
+    <div class="w-full bg-slate-700 rounded-full h-2">
+      <div id="weightBar" class="bg-gradient-to-r from-blue-500 to-green-500 h-2 rounded-full transition-all" style="width:0%"></div>
+    </div>
+    <div class="flex justify-between mt-1 text-xs text-slate-500">
+      <span>80 kg</span><span>75 kg</span>
+    </div>
+  </div>
+
+  <!-- Strength PRs -->
+  <div class="bg-card rounded-xl p-4 mb-3 metric-card">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Strength Benchmarks</span>
+    <div class="grid grid-cols-3 gap-3 mt-3">
+      <div class="text-center">
+        <div class="text-2xl font-bold" id="prSquat">148</div>
+        <div class="text-xs text-slate-400">Squat</div>
+        <div class="text-xs text-slate-500">kg</div>
+      </div>
+      <div class="text-center">
+        <div class="text-2xl font-bold" id="prDeadlift">178</div>
+        <div class="text-xs text-slate-400">Deadlift</div>
+        <div class="w-full bg-slate-700 rounded-full h-1 mt-1"><div id="dlBar" class="bg-amber-500 h-1 rounded-full" style="width:89%"></div></div>
+        <div class="text-xs text-amber-500 mt-0.5">→ 200kg</div>
+      </div>
+      <div class="text-center">
+        <div class="text-2xl font-bold" id="prBench">70</div>
+        <div class="text-xs text-slate-400">Bench</div>
+        <div class="text-xs text-slate-500">kg</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Today's Plan -->
+  <div class="bg-card rounded-xl p-4 mb-3 metric-card">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Today's Plan</span>
+      <span class="badge bg-blue-500/20 text-blue-400" id="todayPhase">Week 1</span>
+    </div>
+    <div id="todayPlan" class="space-y-2"></div>
+  </div>
+
+  <!-- Weekly Summary -->
+  <div class="bg-card rounded-xl p-4 mb-3 metric-card">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">This Week</span>
+    <div class="grid grid-cols-4 gap-2 mt-3">
+      <div class="text-center bg-slate-700/50 rounded-lg p-2">
+        <div class="text-lg font-bold text-blue-400" id="weekGym">0</div>
+        <div class="text-xs text-slate-400">Gym</div>
+      </div>
+      <div class="text-center bg-slate-700/50 rounded-lg p-2">
+        <div class="text-lg font-bold text-tennis" id="weekTennis">0</div>
+        <div class="text-xs text-slate-400">Tennis</div>
+      </div>
+      <div class="text-center bg-slate-700/50 rounded-lg p-2">
+        <div class="text-lg font-bold text-purple-400" id="weekZwift">0</div>
+        <div class="text-xs text-slate-400">Zwift</div>
+      </div>
+      <div class="text-center bg-slate-700/50 rounded-lg p-2">
+        <div class="text-lg font-bold text-amber-400" id="weekCals">0</div>
+        <div class="text-xs text-slate-400">kcal avg</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="grid grid-cols-2 gap-3 mb-3">
+    <button onclick="startQuickLog('gym')" class="bg-card hover:bg-cardHover rounded-xl p-4 text-left metric-card">
+      <div class="text-2xl mb-1">🏋️</div>
+      <div class="font-semibold text-sm">Log Gym</div>
+      <div class="text-xs text-slate-400">Quick session entry</div>
+    </button>
+    <button onclick="startQuickLog('tennis')" class="bg-card hover:bg-cardHover rounded-xl p-4 text-left metric-card">
+      <div class="text-2xl mb-1">🎾</div>
+      <div class="font-semibold text-sm">Log Tennis</div>
+      <div class="text-xs text-slate-400">Court session</div>
+    </button>
+    <button onclick="startQuickLog('body')" class="bg-card hover:bg-cardHover rounded-xl p-4 text-left metric-card">
+      <div class="text-2xl mb-1">⚖️</div>
+      <div class="font-semibold text-sm">Log Weight</div>
+      <div class="text-xs text-slate-400">Body tracking</div>
+    </button>
+    <button onclick="startQuickLog('zwift')" class="bg-card hover:bg-cardHover rounded-xl p-4 text-left metric-card">
+      <div class="text-2xl mb-1">🚴</div>
+      <div class="font-semibold text-sm">Log Zwift</div>
+      <div class="text-xs text-slate-400">Cycling session</div>
+    </button>
+  </div>
+
+  <!-- Mini Weight Chart -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Weight Trend (30 days)</span>
+    <canvas id="dashWeightChart" class="mt-2" height="120"></canvas>
+  </div>
+</div>
+
+<!-- ===== TRAINING LOG ===== -->
+<div id="pageTraining" class="page">
+  <!-- Session Type Tabs -->
+  <div class="flex gap-1 bg-card rounded-xl p-1 mb-4">
+    <button class="tab-btn active" onclick="setGymSession('squat',this)">Squat</button>
+    <button class="tab-btn" onclick="setGymSession('deadlift',this)">Deadlift</button>
+    <button class="tab-btn" onclick="setGymSession('push',this)">Push</button>
+    <button class="tab-btn" onclick="setGymSession('pull',this)">Pull</button>
+  </div>
+
+  <!-- Current Session -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="font-bold text-lg" id="gymSessionTitle">Squat Day</h3>
+      <span class="badge bg-blue-500/20 text-blue-400" id="gymSessionDate"></span>
+    </div>
+
+    <!-- Exercise Selector -->
+    <select id="exerciseSelect" class="mb-3" onchange="updateExerciseInfo()">
+      <option value="">Select exercise...</option>
+    </select>
+
+    <!-- Exercise Info -->
+    <div id="exerciseInfo" class="hidden bg-slate-700/30 rounded-lg p-3 mb-3">
+      <div class="text-xs text-slate-400 mb-1" id="exTransfer"></div>
+      <div class="text-xs text-blue-400" id="exPrescription"></div>
+    </div>
+
+    <!-- Set Logger -->
+    <div class="grid grid-cols-12 gap-2 mb-2 text-xs text-slate-400 font-semibold">
+      <div class="col-span-1">Set</div>
+      <div class="col-span-3">Weight</div>
+      <div class="col-span-2">Reps</div>
+      <div class="col-span-2">RPE</div>
+      <div class="col-span-3">Tempo</div>
+      <div class="col-span-1"></div>
+    </div>
+    <div id="setsContainer" class="space-y-2 mb-3"></div>
+
+    <div class="flex gap-2">
+      <button onclick="addSet()" class="btn btn-primary flex-1">+ Add Set</button>
+      <button onclick="saveExercise()" class="btn btn-success flex-1">Save Exercise</button>
+    </div>
+  </div>
+
+  <!-- Session Log (current) -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <div class="flex justify-between items-center mb-2">
+      <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Session Log</span>
+      <button onclick="finishSession()" class="btn btn-success text-xs py-1 px-3">Finish Session</button>
+    </div>
+    <div id="sessionLog" class="space-y-2">
+      <p class="text-sm text-slate-500 italic">No exercises logged yet</p>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Recent Sessions</span>
+    <div id="gymHistory" class="mt-2 space-y-2"></div>
+  </div>
+
+  <!-- PR Board -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Personal Records</span>
+    <div id="prBoard" class="mt-2 space-y-1"></div>
+  </div>
+</div>
+
+<!-- ===== TENNIS ===== -->
+<div id="pageTennis" class="page">
+  <!-- Session Type -->
+  <div class="flex gap-1 bg-card rounded-xl p-1 mb-4">
+    <button class="tab-btn active" onclick="setTennisMode('practice',this)">Practice</button>
+    <button class="tab-btn" onclick="setTennisMode('match',this)">Match</button>
+    <button class="tab-btn" onclick="setTennisMode('drill',this)">Drill</button>
+  </div>
+
+  <!-- Serve Tracker -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <div class="flex justify-between items-center mb-3">
+      <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Serve Tracker</span>
+      <button onclick="resetServeCount()" class="text-xs text-slate-500">Reset</button>
+    </div>
+    <div class="grid grid-cols-4 gap-3 mb-3">
+      <div class="text-center">
+        <div class="counter-btn bg-blue-500 text-white mx-auto mb-1" onclick="countServe('total')">+</div>
+        <div class="text-xl font-bold" id="serveTotal">0</div>
+        <div class="text-xs text-slate-400">Total</div>
+      </div>
+      <div class="text-center">
+        <div class="counter-btn bg-green-500 text-white mx-auto mb-1" onclick="countServe('in')">+</div>
+        <div class="text-xl font-bold text-tennis" id="serveIn">0</div>
+        <div class="text-xs text-slate-400">In</div>
+      </div>
+      <div class="text-center">
+        <div class="counter-btn bg-amber-500 text-white mx-auto mb-1" onclick="countServe('ace')">+</div>
+        <div class="text-xl font-bold text-amber-400" id="serveAce">0</div>
+        <div class="text-xs text-slate-400">Ace</div>
+      </div>
+      <div class="text-center">
+        <div class="counter-btn bg-red-500 text-white mx-auto mb-1" onclick="countServe('fault')">+</div>
+        <div class="text-xl font-bold text-red-400" id="serveFault">0</div>
+        <div class="text-xs text-slate-400">Fault</div>
+      </div>
+    </div>
+    <div class="bg-slate-700/50 rounded-lg p-2 text-center">
+      <span class="text-2xl font-bold" id="servePercent">0%</span>
+      <span class="text-xs text-slate-400 ml-1">1st Serve %</span>
+    </div>
+  </div>
+
+  <!-- Shot Ratings -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Shot Quality (1-10)</span>
+    <div class="space-y-3 mt-3">
+      <div class="flex items-center gap-3">
+        <span class="text-sm w-24">Forehand</span>
+        <input type="range" min="1" max="10" value="5" id="rateForehand" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value">
+        <span class="text-sm font-bold w-6 text-right">5</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-sm w-24">Backhand</span>
+        <input type="range" min="1" max="10" value="5" id="rateBackhand" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value">
+        <span class="text-sm font-bold w-6 text-right">5</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-sm w-24">Serve</span>
+        <input type="range" min="1" max="10" value="5" id="rateServe" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value">
+        <span class="text-sm font-bold w-6 text-right">5</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-sm w-24">Movement</span>
+        <input type="range" min="1" max="10" value="5" id="rateMovement" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value">
+        <span class="text-sm font-bold w-6 text-right">5</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-sm w-24">Volley</span>
+        <input type="range" min="1" max="10" value="5" id="rateVolley" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value">
+        <span class="text-sm font-bold w-6 text-right">5</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Match Result (shown when match mode) -->
+  <div id="matchSection" class="hidden">
+    <div class="bg-card rounded-xl p-4 mb-3">
+      <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Match Result</span>
+      <div class="grid grid-cols-2 gap-3 mt-3">
+        <div>
+          <label class="text-xs text-slate-400">Result</label>
+          <select id="matchResult">
+            <option value="win">Win</option>
+            <option value="loss">Loss</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-slate-400">Score</label>
+          <input type="text" id="matchScore" placeholder="6-4, 6-3">
+        </div>
+      </div>
+      <div class="mt-2">
+        <label class="text-xs text-slate-400">Opponent</label>
+        <input type="text" id="matchOpponent" placeholder="Opponent name">
+      </div>
+    </div>
+  </div>
+
+  <!-- Session Details -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="text-xs text-slate-400">Duration (min)</label>
+        <input type="number" id="tennisDuration" placeholder="90" value="90">
+      </div>
+      <div>
+        <label class="text-xs text-slate-400">Session RPE</label>
+        <input type="number" id="tennisRPE" placeholder="7" min="1" max="10">
+      </div>
+    </div>
+    <div class="mt-2">
+      <label class="text-xs text-slate-400">Notes</label>
+      <textarea id="tennisNotes" rows="2" placeholder="Session notes..."></textarea>
+    </div>
+    <button onclick="saveTennisSession()" class="btn btn-success w-full mt-3">Save Tennis Session</button>
+  </div>
+
+  <!-- Tennis History -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Recent Tennis Sessions</span>
+    <div id="tennisHistory" class="mt-2 space-y-2"></div>
+  </div>
+
+  <!-- Serve Trend -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Serve % Trend</span>
+    <canvas id="serveTrendChart" class="mt-2" height="150"></canvas>
+  </div>
+</div>
+
+<!-- ===== ANALYTICS ===== -->
+<div id="pageAnalytics" class="page">
+  <!-- Period Selector -->
+  <div class="flex gap-1 bg-card rounded-xl p-1 mb-4">
+    <button class="tab-btn active" onclick="setAnalyticsPeriod(30,this)">30d</button>
+    <button class="tab-btn" onclick="setAnalyticsPeriod(60,this)">60d</button>
+    <button class="tab-btn" onclick="setAnalyticsPeriod(90,this)">90d</button>
+    <button class="tab-btn" onclick="setAnalyticsPeriod(180,this)">6mo</button>
+  </div>
+
+  <!-- Weight Trend -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Weight Trend</span>
+    <canvas id="weightTrendChart" class="mt-2" height="180"></canvas>
+    <div class="grid grid-cols-3 gap-2 mt-2 text-center">
+      <div><div class="text-sm font-bold" id="statWeightStart">80.0</div><div class="text-xs text-slate-400">Start</div></div>
+      <div><div class="text-sm font-bold" id="statWeightCurrent">80.0</div><div class="text-xs text-slate-400">Current</div></div>
+      <div><div class="text-sm font-bold text-tennis" id="statWeightLost">0.0</div><div class="text-xs text-slate-400">Lost</div></div>
+    </div>
+  </div>
+
+  <!-- Strength Progression -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Strength Progression</span>
+    <canvas id="strengthChart" class="mt-2" height="200"></canvas>
+  </div>
+
+  <!-- Training Volume -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Weekly Training Volume</span>
+    <canvas id="volumeChart" class="mt-2" height="180"></canvas>
+  </div>
+
+  <!-- Tennis Progress -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Tennis Shot Ratings</span>
+    <canvas id="tennisRadarChart" class="mt-2" height="250"></canvas>
+  </div>
+
+  <!-- Compliance -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Program Compliance</span>
+    <div class="grid grid-cols-2 gap-3 mt-3">
+      <div class="bg-slate-700/50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-blue-400" id="compGym">0%</div>
+        <div class="text-xs text-slate-400">Gym Sessions</div>
+      </div>
+      <div class="bg-slate-700/50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-tennis" id="compTennis">0%</div>
+        <div class="text-xs text-slate-400">Tennis Sessions</div>
+      </div>
+      <div class="bg-slate-700/50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-amber-400" id="compNutrition">0%</div>
+        <div class="text-xs text-slate-400">Nutrition</div>
+      </div>
+      <div class="bg-slate-700/50 rounded-lg p-3 text-center">
+        <div class="text-2xl font-bold text-purple-400" id="compRecovery">0%</div>
+        <div class="text-xs text-slate-400">Recovery</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== COACH ===== -->
+<div id="pageCoach" class="page">
+  <!-- Readiness Score -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Training Readiness</span>
+    <div class="flex items-center gap-4 mt-3">
+      <div class="relative">
+        <svg width="80" height="80" class="progress-ring">
+          <circle cx="40" cy="40" r="35" fill="none" stroke="#334155" stroke-width="6"/>
+          <circle id="readinessRing" cx="40" cy="40" r="35" fill="none" stroke="#22c55e" stroke-width="6" stroke-dasharray="220" stroke-dashoffset="110" stroke-linecap="round"/>
+        </svg>
+        <div class="absolute inset-0 flex items-center justify-center text-xl font-bold" id="readinessScore">--</div>
+      </div>
+      <div class="flex-1">
+        <div class="space-y-1">
+          <div class="flex justify-between text-xs"><span class="text-slate-400">Sleep</span><span id="readSleep" class="font-semibold">--</span></div>
+          <div class="flex justify-between text-xs"><span class="text-slate-400">Soreness</span><span id="readSoreness" class="font-semibold">--</span></div>
+          <div class="flex justify-between text-xs"><span class="text-slate-400">Energy</span><span id="readEnergy" class="font-semibold">--</span></div>
+          <div class="flex justify-between text-xs"><span class="text-slate-400">Stress</span><span id="readStress" class="font-semibold">--</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Goal Progress -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Goal Progress</span>
+    <div class="space-y-3 mt-3">
+      <div>
+        <div class="flex justify-between text-sm mb-1"><span>Deadlift 200kg</span><span class="font-bold" id="goalDL">89%</span></div>
+        <div class="w-full bg-slate-700 rounded-full h-2"><div id="goalDLBar" class="bg-amber-500 h-2 rounded-full transition-all" style="width:89%"></div></div>
+      </div>
+      <div>
+        <div class="flex justify-between text-sm mb-1"><span>Weight 75kg</span><span class="font-bold" id="goalWeight">0%</span></div>
+        <div class="w-full bg-slate-700 rounded-full h-2"><div id="goalWeightBar" class="bg-tennis h-2 rounded-full transition-all" style="width:0%"></div></div>
+      </div>
+      <div>
+        <div class="flex justify-between text-sm mb-1"><span>Serve Consistency</span><span class="font-bold" id="goalServe">--</span></div>
+        <div class="w-full bg-slate-700 rounded-full h-2"><div id="goalServeBar" class="bg-blue-500 h-2 rounded-full transition-all" style="width:0%"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Coach Suggestions -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <div class="flex justify-between items-center mb-3">
+      <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">🤖 Coach Insights</span>
+      <button onclick="generateCoachInsights()" class="btn btn-ghost text-xs py-1">Refresh</button>
+    </div>
+    <div id="coachInsights" class="space-y-2">
+      <p class="text-sm text-slate-500 italic">Tap refresh to generate coaching insights based on your data...</p>
+    </div>
+  </div>
+
+  <!-- Injury Risk -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Injury Risk Monitor</span>
+    <div class="space-y-2 mt-3">
+      <div class="flex justify-between items-center">
+        <span class="text-sm">Tennis Elbow</span>
+        <span class="badge" id="riskElbow">Low</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-sm">Shoulder</span>
+        <span class="badge" id="riskShoulder">Low</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-sm">Lower Back</span>
+        <span class="badge" id="riskBack">Low</span>
+      </div>
+      <div class="flex justify-between items-center">
+        <span class="text-sm">Knee</span>
+        <span class="badge" id="riskKnee">Low</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Next Session Recommendation -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Recommended Next Session</span>
+    <div id="nextSession" class="mt-2">
+      <p class="text-sm text-slate-500 italic">Loading recommendation...</p>
+    </div>
+  </div>
+
+  <!-- Milestones -->
+  <div class="bg-card rounded-xl p-4 mb-3">
+    <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Milestones</span>
+    <div id="milestones" class="mt-2 space-y-2"></div>
+  </div>
+</div>
+
+</main>
+
+<!-- ==================== BOTTOM NAV ==================== -->
+<nav class="glass fixed bottom-0 left-0 right-0 z-40 border-t border-slate-700/50" style="padding-bottom:env(safe-area-inset-bottom)">
+  <div class="flex">
+    <button onclick="navigate('Dashboard')" class="flex-1 py-2 flex flex-col items-center nav-btn active" data-page="Dashboard">
+      <span class="text-xl">📊</span>
+      <span class="text-xs mt-0.5">Home</span>
+    </button>
+    <button onclick="navigate('Training')" class="flex-1 py-2 flex flex-col items-center nav-btn" data-page="Training">
+      <span class="text-xl">🏋️</span>
+      <span class="text-xs mt-0.5">Training</span>
+    </button>
+    <button onclick="navigate('Tennis')" class="flex-1 py-2 flex flex-col items-center nav-btn" data-page="Tennis">
+      <span class="text-xl">🎾</span>
+      <span class="text-xs mt-0.5">Tennis</span>
+    </button>
+    <button onclick="navigate('Analytics')" class="flex-1 py-2 flex flex-col items-center nav-btn" data-page="Analytics">
+      <span class="text-xl">📈</span>
+      <span class="text-xs mt-0.5">Stats</span>
+    </button>
+    <button onclick="navigate('Coach')" class="flex-1 py-2 flex flex-col items-center nav-btn" data-page="Coach">
+      <span class="text-xl">🤖</span>
+      <span class="text-xs mt-0.5">Coach</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ==================== MODALS ==================== -->
+<div id="modalOverlay" class="modal-overlay hidden" onclick="closeModal(event)">
+  <div class="modal-content slide-up" onclick="event.stopPropagation()">
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- ==================== JAVASCRIPT ==================== -->
+<script>
+// ==================== DATA MODELS & STORAGE ====================
+const DB = {
+  get(key, def = null) { try { return JSON.parse(localStorage.getItem('stevi_' + key)) || def } catch { return def } },
+  set(key, val) { localStorage.setItem('stevi_' + key, JSON.stringify(val)) },
+  push(key, item) { const arr = this.get(key, []); arr.push(item); this.set(key, arr); return arr },
+};
+
+const ATHLETE = {
+  name: 'Stevi', age: 40, height: 169, startWeight: 80, targetWeight: 75,
+  startSquat: 148, startDeadlift: 178, startBench: 70, goalDeadlift: 200,
+  calfRaise: 140, facePull: 57
+};
+
+const EXERCISES = {
+  squat: [
+    { name: 'Back Squat', transfer: 'Force production for split step & serve leg drive', rx: '4×3-5 @RPE 7-8, Tempo 3010, Rest 3min' },
+    { name: 'Front Squat', transfer: 'Upright torso strength for deceleration', rx: '3×5-6 @RPE 7, Tempo 3110, Rest 2.5min' },
+    { name: 'Bulgarian Split Squat', transfer: 'Single-leg stability for wide stance shots', rx: '3×8-10/leg @RPE 7-8, Tempo 3010, Rest 90s' },
+    { name: 'Leg Press', transfer: 'Leg drive volume without spinal load', rx: '3×10-12 @RPE 7, Tempo 2010, Rest 90s' },
+    { name: 'Walking Lunge', transfer: 'Dynamic single-leg for court coverage', rx: '3×12 steps @RPE 6-7, Tempo 2010, Rest 90s' },
+    { name: 'Calf Raise', transfer: 'Ankle stiffness for split step reactivity', rx: '4×12-15 @RPE 8, Tempo 2110, Rest 60s' },
+    { name: 'Goblet Squat', transfer: 'Movement quality and thoracic mobility', rx: '2×12 @RPE 6, Tempo 3110, Rest 60s' },
+    { name: 'Step-Up', transfer: 'Concentric single-leg power for explosive first step', rx: '3×8/leg @RPE 7, Tempo 1010, Rest 90s' },
+  ],
+  deadlift: [
+    { name: 'Conventional Deadlift', transfer: 'Posterior chain for serve kinetic chain', rx: '4×3-5 @RPE 7-8, Tempo 2010, Rest 3min' },
+    { name: 'Trap Bar Deadlift', transfer: 'Hip extension power with less spinal load', rx: '3×5 @RPE 7, Tempo 2010, Rest 2.5min' },
+    { name: 'Romanian Deadlift', transfer: 'Hamstring eccentric for deceleration', rx: '3×8-10 @RPE 7, Tempo 3110, Rest 2min' },
+    { name: 'Hip Thrust', transfer: 'Horizontal force for explosive first step', rx: '3×10-12 @RPE 7-8, Tempo 2110, Rest 90s' },
+    { name: 'Good Morning', transfer: 'Posterior chain endurance for match stamina', rx: '3×10 @RPE 6-7, Tempo 3010, Rest 90s' },
+    { name: 'Nordic Curl', transfer: 'Hamstring injury prevention at high speeds', rx: '3×5-8 @RPE 8, Tempo 3010, Rest 90s' },
+    { name: 'Single-Leg RDL', transfer: 'Balance + posterior chain for court movement', rx: '3×8/leg @RPE 7, Tempo 3010, Rest 60s' },
+    { name: 'Pull-Through', transfer: 'Hip hinge pattern reinforcement', rx: '3×12-15 @RPE 6, Tempo 2010, Rest 60s' },
+  ],
+  push: [
+    { name: 'Bench Press', transfer: 'Upper body pressing foundation', rx: '4×5-6 @RPE 7-8, Tempo 3010, Rest 2.5min' },
+    { name: 'Overhead Press', transfer: 'Shoulder stability for serve overhead position', rx: '3×6-8 @RPE 7, Tempo 2010, Rest 2min' },
+    { name: 'Incline DB Press', transfer: 'Anterior deltoid strength for serve acceleration', rx: '3×8-10 @RPE 7, Tempo 3010, Rest 90s' },
+    { name: 'Landmine Press', transfer: 'Rotational pressing mimics serve pattern', rx: '3×8/arm @RPE 7, Tempo 2010, Rest 90s' },
+    { name: 'Push-Up Variations', transfer: 'Scapular stability + pressing endurance', rx: '3×12-15 @RPE 6, Tempo 2010, Rest 60s' },
+    { name: 'Dips', transfer: 'Tricep strength for serve extension', rx: '3×8-10 @RPE 7, Tempo 2010, Rest 90s' },
+    { name: 'Cable Fly', transfer: 'Pec stretch-shortening for forehand follow-through', rx: '3×12-15 @RPE 6, Tempo 2010, Rest 60s' },
+    { name: 'OH Tricep Extension', transfer: 'Overhead arm extension for serve', rx: '3×12-15 @RPE 6-7, Tempo 2010, Rest 60s' },
+  ],
+  pull: [
+    { name: 'Pull-Up', transfer: 'Lat strength for serve acceleration', rx: '4×6-8 @RPE 7-8, Tempo 2010, Rest 2min' },
+    { name: 'Barbell Row', transfer: 'Scapular retraction for shoulder health', rx: '4×6-8 @RPE 7, Tempo 2010, Rest 2min' },
+    { name: 'Face Pull', transfer: 'Posterior shoulder + external rotation = injury prevention', rx: '4×15-20 @RPE 7, Tempo 2110, Rest 60s' },
+    { name: 'Cable Row', transfer: 'Mid-back endurance for posture during long matches', rx: '3×10-12 @RPE 7, Tempo 2110, Rest 90s' },
+    { name: 'Single-Arm DB Row', transfer: 'Anti-rotation + pulling = core + back', rx: '3×10/arm @RPE 7, Tempo 2010, Rest 60s' },
+    { name: 'Band Pull-Apart', transfer: 'Rear delt activation pre-serve warm-up', rx: '3×20 @RPE 5-6, Tempo 1110, Rest 30s' },
+    { name: 'Lat Pulldown', transfer: 'Lat engagement for overhead stroke power', rx: '3×10-12 @RPE 7, Tempo 2110, Rest 90s' },
+    { name: 'Reverse Cable Fly', transfer: 'Posterior shoulder for arm deceleration', rx: '3×15 @RPE 6, Tempo 2110, Rest 60s' },
+  ]
+};
+
+const WEEK_PLAN = {
+  0: { type: 'rest', label: 'Rest / Active Recovery', icon: '😴' },
+  1: { type: 'gym', session: 'squat', label: 'Squat Day + Plyometrics', icon: '🏋️' },
+  2: { type: 'tennis', label: 'Tennis Practice (Movement Focus)', icon: '🎾' },
+  3: { type: 'gym', session: 'push', label: 'Upper Push + Core', icon: '💪' },
+  4: { type: 'tennis', label: 'Tennis Practice (Strokes)', icon: '🎾' },
+  5: { type: 'gym', session: 'deadlift', label: 'Deadlift Day + Speed', icon: '🏋️' },
+  6: { type: 'multi', label: 'Tennis Match / Upper Pull + Zwift', icon: '🎾🚴' },
+};
+
+let currentGymSession = 'squat';
+let currentTennisMode = 'practice';
+let currentSessionExercises = [];
+let serveCount = { total: 0, in: 0, ace: 0, fault: 0 };
+let analyticsPeriod = 30;
+let charts = {};
+
+// ==================== NAVIGATION ====================
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page' + page).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.page === page);
+    b.querySelector('span:last-child').style.color = b.dataset.page === page ? '#3b82f6' : '#94a3b8';
+  });
+  if (page === 'Analytics') renderAnalytics();
+  if (page === 'Coach') renderCoach();
+  if (page === 'Dashboard') renderDashboard();
+  if (page === 'Training') renderTrainingHistory();
+  if (page === 'Tennis') renderTennisHistory();
+}
+
+// ==================== TOAST ====================
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600'}`;
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 2500);
+}
+
+// ==================== DASHBOARD ====================
+function renderDashboard() {
+  const today = new Date();
+  document.getElementById('topDate').textContent = today.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  document.getElementById('gymSessionDate').textContent = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  const weights = DB.get('body', []);
+  const currentW = weights.length ? weights[weights.length - 1].weight : 80;
+  document.getElementById('currentWeight').textContent = currentW.toFixed(1);
+  const pct = Math.max(0, Math.min(100, ((80 - currentW) / (80 - 75)) * 100));
+  document.getElementById('weightBar').style.width = pct + '%';
+  document.getElementById('weightDelta').textContent = currentW < 80 ? `↓ ${(80 - currentW).toFixed(1)} kg` : 'Start tracking';
+
+  const prs = DB.get('prs', { squat: 148, deadlift: 178, bench: 70 });
+  document.getElementById('prSquat').textContent = prs.squat;
+  document.getElementById('prDeadlift').textContent = prs.deadlift;
+  document.getElementById('prBench').textContent = prs.bench;
+  document.getElementById('dlBar').style.width = (prs.deadlift / 200 * 100) + '%';
+
+  const dayOfWeek = today.getDay();
+  const plan = WEEK_PLAN[dayOfWeek];
+  document.getElementById('todayPlan').innerHTML = `
+    <div class="flex items-center gap-3 bg-slate-700/30 rounded-lg p-3">
+      <span class="text-2xl">${plan.icon}</span>
+      <div>
+        <div class="font-semibold text-sm">${plan.label}</div>
+        <div class="text-xs text-slate-400">${plan.type === 'rest' ? 'Recovery focus' : 'Tap Quick Actions below to log'}</div>
+      </div>
+    </div>`;
+
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() - today.getDay());
+  const weekKey = weekStart.toISOString().slice(0, 10);
+  const sessions = DB.get('sessions', []).filter(s => s.date >= weekKey);
+  document.getElementById('weekGym').textContent = sessions.filter(s => s.type === 'gym').length;
+  document.getElementById('weekTennis').textContent = sessions.filter(s => s.type === 'tennis').length;
+  document.getElementById('weekZwift').textContent = sessions.filter(s => s.type === 'zwift').length;
+
+  const weekBodies = DB.get('body', []).filter(b => b.date >= weekKey);
+  const avgCal = weekBodies.length ? Math.round(weekBodies.reduce((s, b) => s + (b.calories || 0), 0) / weekBodies.length) : 0;
+  document.getElementById('weekCals').textContent = avgCal || '--';
+
+  renderDashWeightChart();
+  updatePhase();
+}
+
+function renderDashWeightChart() {
+  const bodies = DB.get('body', []).slice(-30);
+  if (charts.dashWeight) charts.dashWeight.destroy();
+  const ctx = document.getElementById('dashWeightChart');
+  if (!ctx || !bodies.length) return;
+  charts.dashWeight = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: bodies.map(b => b.date.slice(5)),
+      datasets: [{
+        data: bodies.map(b => b.weight),
+        borderColor: '#3b82f6', borderWidth: 2, fill: true,
+        backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, pointRadius: 2
+      }, {
+        data: bodies.map(() => 75),
+        borderColor: '#22c55e', borderWidth: 1, borderDash: [5, 5],
+        pointRadius: 0, fill: false
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { x: { display: false }, y: { display: true, ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } } } }
+  });
+}
+
+function updatePhase() {
+  const startDate = DB.get('startDate', new Date().toISOString().slice(0, 10));
+  const daysSinceStart = Math.floor((new Date() - new Date(startDate)) / 86400000);
+  const week = Math.floor(daysSinceStart / 7) + 1;
+  const phase = week <= 8 ? 'GPP' : week <= 16 ? 'SPP' : week <= 20 ? 'Pre-Comp' : 'Competition';
+  document.getElementById('todayPhase').textContent = `Week ${week} · ${phase}`;
+}
+
+// ==================== GYM TRAINING ====================
+function setGymSession(session, btn) {
+  currentGymSession = session;
+  currentSessionExercises = [];
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const titles = { squat: 'Squat Day', deadlift: 'Deadlift Day', push: 'Upper Push', pull: 'Upper Pull' };
+  document.getElementById('gymSessionTitle').textContent = titles[session];
+  populateExercises();
+  document.getElementById('sessionLog').innerHTML = '<p class="text-sm text-slate-500 italic">No exercises logged yet</p>';
+  document.getElementById('setsContainer').innerHTML = '';
+}
+
+function populateExercises() {
+  const sel = document.getElementById('exerciseSelect');
+  sel.innerHTML = '<option value="">Select exercise...</option>';
+  EXERCISES[currentGymSession].forEach((ex, i) => {
+    sel.innerHTML += `<option value="${i}">${ex.name}</option>`;
+  });
+  document.getElementById('exerciseInfo').classList.add('hidden');
+}
+
+function updateExerciseInfo() {
+  const idx = document.getElementById('exerciseSelect').value;
+  const info = document.getElementById('exerciseInfo');
+  if (idx === '') { info.classList.add('hidden'); return; }
+  const ex = EXERCISES[currentGymSession][idx];
+  info.classList.remove('hidden');
+  document.getElementById('exTransfer').textContent = '🎾 ' + ex.transfer;
+  document.getElementById('exPrescription').textContent = '📋 ' + ex.rx;
+  document.getElementById('setsContainer').innerHTML = '';
+  addSet();
+}
+
+function addSet() {
+  const container = document.getElementById('setsContainer');
+  const setNum = container.children.length + 1;
+  const row = document.createElement('div');
+  row.className = 'grid grid-cols-12 gap-2 items-center';
+  row.innerHTML = `
+    <div class="col-span-1 text-sm font-bold text-slate-400">${setNum}</div>
+    <div class="col-span-3"><input type="number" class="set-weight text-sm p-1.5" placeholder="kg" step="2.5"></div>
+    <div class="col-span-2"><input type="number" class="set-reps text-sm p-1.5" placeholder="reps"></div>
+    <div class="col-span-2"><input type="number" class="set-rpe text-sm p-1.5" placeholder="RPE" min="1" max="10" step="0.5"></div>
+    <div class="col-span-3"><input type="text" class="set-tempo text-sm p-1.5" placeholder="3010"></div>
+    <div class="col-span-1"><button onclick="this.closest('.grid').remove()" class="text-red-400 text-lg">×</button></div>`;
+  container.appendChild(row);
+}
+
+function saveExercise() {
+  const idx = document.getElementById('exerciseSelect').value;
+  if (idx === '') { showToast('Select an exercise first', 'error'); return; }
+  const ex = EXERCISES[currentGymSession][idx];
+  const sets = [];
+  document.querySelectorAll('#setsContainer > div').forEach(row => {
+    const w = parseFloat(row.querySelector('.set-weight').value);
+    const r = parseInt(row.querySelector('.set-reps').value);
+    const rpe = parseFloat(row.querySelector('.set-rpe').value);
+    const tempo = row.querySelector('.set-tempo').value;
+    if (w && r) sets.push({ weight: w, reps: r, rpe: rpe || null, tempo: tempo || null });
+  });
+  if (!sets.length) { showToast('Log at least one set', 'error'); return; }
+
+  const entry = { name: ex.name, sets, timestamp: Date.now() };
+  currentSessionExercises.push(entry);
+
+  const maxW = Math.max(...sets.map(s => s.weight));
+  const prs = DB.get('prs', { squat: 148, deadlift: 178, bench: 70 });
+  const prKey = ex.name.toLowerCase().includes('squat') && !ex.name.includes('Goblet') ? 'squat' :
+    ex.name.toLowerCase().includes('deadlift') || ex.name === 'Conventional Deadlift' ? 'deadlift' :
+    ex.name === 'Bench Press' ? 'bench' : null;
+  if (prKey && maxW > prs[prKey]) {
+    prs[prKey] = maxW;
+    DB.set('prs', prs);
+    showToast(`🎉 New ${prKey} PR: ${maxW}kg!`, 'success');
+  }
+
+  renderSessionLog();
+  document.getElementById('exerciseSelect').value = '';
+  document.getElementById('exerciseInfo').classList.add('hidden');
+  document.getElementById('setsContainer').innerHTML = '';
+  showToast(`${ex.name} saved (${sets.length} sets)`, 'success');
+}
+
+function renderSessionLog() {
+  const log = document.getElementById('sessionLog');
+  if (!currentSessionExercises.length) {
+    log.innerHTML = '<p class="text-sm text-slate-500 italic">No exercises logged yet</p>';
+    return;
+  }
+  log.innerHTML = currentSessionExercises.map(ex => `
+    <div class="bg-slate-700/30 rounded-lg p-2">
+      <div class="font-semibold text-sm">${ex.name}</div>
+      <div class="text-xs text-slate-400 mt-1">${ex.sets.map(s => `${s.weight}kg × ${s.reps}${s.rpe ? ' @' + s.rpe : ''}`).join(' | ')}</div>
+    </div>`).join('');
+}
+
+function finishSession() {
+  if (!currentSessionExercises.length) { showToast('No exercises to save', 'error'); return; }
+  const session = {
+    id: Date.now(), type: 'gym', session: currentGymSession,
+    date: new Date().toISOString().slice(0, 10),
+    exercises: currentSessionExercises,
+    duration: null
+  };
+  DB.push('sessions', session);
+  currentSessionExercises = [];
+  renderSessionLog();
+  renderTrainingHistory();
+  showToast('Session saved!', 'success');
+}
+
+function renderTrainingHistory() {
+  const sessions = DB.get('sessions', []).filter(s => s.type === 'gym').slice(-10).reverse();
+  const el = document.getElementById('gymHistory');
+  if (!sessions.length) { el.innerHTML = '<p class="text-sm text-slate-500 italic">No sessions yet</p>'; return; }
+  el.innerHTML = sessions.map(s => {
+    const titles = { squat: 'Squat', deadlift: 'Deadlift', push: 'Upper Push', pull: 'Upper Pull' };
+    const exNames = s.exercises ? s.exercises.map(e => e.name).join(', ') : '';
+    return `<div class="bg-slate-700/30 rounded-lg p-2">
+      <div class="flex justify-between"><span class="font-semibold text-sm">${titles[s.session] || s.session}</span><span class="text-xs text-slate-400">${s.date}</span></div>
+      <div class="text-xs text-slate-400 mt-0.5">${exNames}</div>
+    </div>`;
+  }).join('');
+
+  const prs = DB.get('prs', { squat: 148, deadlift: 178, bench: 70 });
+  document.getElementById('prBoard').innerHTML = `
+    <div class="flex justify-between text-sm"><span>Back Squat</span><span class="font-bold">${prs.squat} kg</span></div>
+    <div class="flex justify-between text-sm"><span>Deadlift</span><span class="font-bold text-amber-400">${prs.deadlift} kg <span class="text-xs text-slate-500">→ 200kg</span></span></div>
+    <div class="flex justify-between text-sm"><span>Bench Press</span><span class="font-bold">${prs.bench} kg</span></div>`;
+}
+
+// ==================== TENNIS ====================
+function setTennisMode(mode, btn) {
+  currentTennisMode = mode;
+  document.querySelectorAll('#pageTennis .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('matchSection').classList.toggle('hidden', mode !== 'match');
+}
+
+function countServe(type) {
+  serveCount[type]++;
+  document.getElementById('serveTotal').textContent = serveCount.total;
+  document.getElementById('serveIn').textContent = serveCount.in;
+  document.getElementById('serveAce').textContent = serveCount.ace;
+  document.getElementById('serveFault').textContent = serveCount.fault;
+  const pct = serveCount.total > 0 ? Math.round((serveCount.in / serveCount.total) * 100) : 0;
+  document.getElementById('servePercent').textContent = pct + '%';
+}
+
+function resetServeCount() {
+  serveCount = { total: 0, in: 0, ace: 0, fault: 0 };
+  ['serveTotal', 'serveIn', 'serveAce', 'serveFault'].forEach(id => document.getElementById(id).textContent = '0');
+  document.getElementById('servePercent').textContent = '0%';
+}
+
+function saveTennisSession() {
+  const session = {
+    id: Date.now(), type: 'tennis', mode: currentTennisMode,
+    date: new Date().toISOString().slice(0, 10),
+    duration: parseInt(document.getElementById('tennisDuration').value) || 90,
+    rpe: parseInt(document.getElementById('tennisRPE').value) || 5,
+    serves: { ...serveCount },
+    ratings: {
+      forehand: parseInt(document.getElementById('rateForehand').value),
+      backhand: parseInt(document.getElementById('rateBackhand').value),
+      serve: parseInt(document.getElementById('rateServe').value),
+      movement: parseInt(document.getElementById('rateMovement').value),
+      volley: parseInt(document.getElementById('rateVolley').value),
+    },
+    notes: document.getElementById('tennisNotes').value,
+  };
+  if (currentTennisMode === 'match') {
+    session.matchResult = document.getElementById('matchResult').value;
+    session.matchScore = document.getElementById('matchScore').value;
+    session.opponent = document.getElementById('matchOpponent').value;
+  }
+  DB.push('sessions', session);
+  resetServeCount();
+  document.getElementById('tennisNotes').value = '';
+  renderTennisHistory();
+  showToast('Tennis session saved!', 'success');
+}
+
+function renderTennisHistory() {
+  const sessions = DB.get('sessions', []).filter(s => s.type === 'tennis').slice(-10).reverse();
+  const el = document.getElementById('tennisHistory');
+  if (!sessions.length) { el.innerHTML = '<p class="text-sm text-slate-500 italic">No tennis sessions yet</p>'; return; }
+  el.innerHTML = sessions.map(s => {
+    const servePct = s.serves && s.serves.total > 0 ? Math.round((s.serves.in / s.serves.total) * 100) : null;
+    return `<div class="bg-slate-700/30 rounded-lg p-2">
+      <div class="flex justify-between items-center">
+        <div><span class="font-semibold text-sm capitalize">${s.mode}</span> <span class="text-xs text-slate-400">${s.duration}min</span></div>
+        <span class="text-xs text-slate-400">${s.date}</span>
+      </div>
+      ${s.mode === 'match' ? `<div class="text-xs mt-1"><span class="${s.matchResult === 'win' ? 'text-tennis' : 'text-red-400'} font-bold">${s.matchResult?.toUpperCase()}</span> ${s.matchScore || ''} vs ${s.opponent || '?'}</div>` : ''}
+      ${servePct !== null ? `<div class="text-xs text-slate-400 mt-1">Serve: ${servePct}% (${s.serves.in}/${s.serves.total})</div>` : ''}
+    </div>`;
+  }).join('');
+  renderServeTrendChart();
+}
+
+function renderServeTrendChart() {
+  const sessions = DB.get('sessions', []).filter(s => s.type === 'tennis' && s.serves && s.serves.total > 0).slice(-15);
+  if (charts.serveTrend) charts.serveTrend.destroy();
+  const ctx = document.getElementById('serveTrendChart');
+  if (!ctx || !sessions.length) return;
+  charts.serveTrend = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: sessions.map(s => s.date.slice(5)),
+      datasets: [{
+        label: '1st Serve %', data: sessions.map(s => Math.round((s.serves.in / s.serves.total) * 100)),
+        borderColor: '#22c55e', borderWidth: 2, fill: true, backgroundColor: 'rgba(34,197,94,0.1)', tension: 0.3, pointRadius: 3
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { display: false } },
+        y: { min: 0, max: 100, ticks: { color: '#64748b', font: { size: 10 }, callback: v => v + '%' }, grid: { color: '#1e293b' } } } }
+  });
+}
+
+// ==================== QUICK LOG MODALS ====================
+function startQuickLog(type) {
+  if (type === 'gym') { navigate('Training'); return; }
+  if (type === 'tennis') { navigate('Tennis'); return; }
+  if (type === 'body') { showBodyModal(); return; }
+  if (type === 'zwift') { showZwiftModal(); return; }
+}
+
+function showBodyModal() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('modalBody').innerHTML = `
+    <h3 class="font-bold text-lg mb-4">⚖️ Log Body Metrics</h3>
+    <div class="space-y-3">
+      <div><label class="text-xs text-slate-400">Date</label><input type="date" id="bodyDate" value="${today}"></div>
+      <div><label class="text-xs text-slate-400">Weight (kg)</label><input type="number" id="bodyWeight" step="0.1" placeholder="79.5"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-400">Calories</label><input type="number" id="bodyCals" placeholder="2500"></div>
+        <div><label class="text-xs text-slate-400">Protein (g)</label><input type="number" id="bodyProtein" placeholder="180"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-400">Sleep (hours)</label><input type="number" id="bodySleep" step="0.5" placeholder="7.5"></div>
+        <div><label class="text-xs text-slate-400">Water (L)</label><input type="number" id="bodyWater" step="0.1" placeholder="3.0"></div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-400">Energy (1-10)</label><input type="number" id="bodyEnergy" min="1" max="10" placeholder="7"></div>
+        <div><label class="text-xs text-slate-400">Soreness (1-10)</label><input type="number" id="bodySoreness" min="1" max="10" placeholder="3"></div>
+      </div>
+      <div><label class="text-xs text-slate-400">Notes</label><textarea id="bodyNotes" rows="2" placeholder="How do you feel?"></textarea></div>
+      <button onclick="saveBody()" class="btn btn-success w-full">Save</button>
+    </div>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function saveBody() {
+  const entry = {
+    date: document.getElementById('bodyDate').value,
+    weight: parseFloat(document.getElementById('bodyWeight').value) || null,
+    calories: parseInt(document.getElementById('bodyCals').value) || null,
+    protein: parseInt(document.getElementById('bodyProtein').value) || null,
+    sleep: parseFloat(document.getElementById('bodySleep').value) || null,
+    water: parseFloat(document.getElementById('bodyWater').value) || null,
+    energy: parseInt(document.getElementById('bodyEnergy').value) || null,
+    soreness: parseInt(document.getElementById('bodySoreness').value) || null,
+    notes: document.getElementById('bodyNotes').value,
+  };
+  if (!entry.weight) { showToast('Enter your weight', 'error'); return; }
+  DB.push('body', entry);
+  closeModal();
+  renderDashboard();
+  showToast('Body metrics saved!', 'success');
+}
+
+function showZwiftModal() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('modalBody').innerHTML = `
+    <h3 class="font-bold text-lg mb-4">🚴 Log Zwift Session</h3>
+    <div class="space-y-3">
+      <div><label class="text-xs text-slate-400">Date</label><input type="date" id="zwiftDate" value="${today}"></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-400">Duration (min)</label><input type="number" id="zwiftDuration" placeholder="45"></div>
+        <div><label class="text-xs text-slate-400">Type</label>
+          <select id="zwiftType"><option value="z2">Zone 2</option><option value="tempo">Tempo</option><option value="hiit">HIIT</option><option value="recovery">Recovery</option></select>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="text-xs text-slate-400">Avg Power (W)</label><input type="number" id="zwiftPower" placeholder="180"></div>
+        <div><label class="text-xs text-slate-400">Avg HR (bpm)</label><input type="number" id="zwiftHR" placeholder="140"></div>
+      </div>
+      <div><label class="text-xs text-slate-400">Distance (km)</label><input type="number" id="zwiftDist" step="0.1" placeholder="25.0"></div>
+      <div><label class="text-xs text-slate-400">Notes</label><textarea id="zwiftNotes" rows="2" placeholder="Route, feeling..."></textarea></div>
+      <button onclick="saveZwift()" class="btn btn-success w-full">Save</button>
+    </div>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function saveZwift() {
+  const session = {
+    id: Date.now(), type: 'zwift',
+    date: document.getElementById('zwiftDate').value,
+    duration: parseInt(document.getElementById('zwiftDuration').value) || 0,
+    zwiftType: document.getElementById('zwiftType').value,
+    power: parseInt(document.getElementById('zwiftPower').value) || null,
+    hr: parseInt(document.getElementById('zwiftHR').value) || null,
+    distance: parseFloat(document.getElementById('zwiftDist').value) || null,
+    notes: document.getElementById('zwiftNotes').value,
+  };
+  DB.push('sessions', session);
+  closeModal();
+  renderDashboard();
+  showToast('Zwift session saved!', 'success');
+}
+
+function showReadinessModal() {
+  document.getElementById('modalBody').innerHTML = `
+    <h3 class="font-bold text-lg mb-4">📊 Daily Readiness Check</h3>
+    <div class="space-y-3">
+      <div class="flex items-center gap-3"><span class="text-sm w-20">Sleep</span><input type="range" min="1" max="10" value="7" id="readySleep" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value"><span class="text-sm font-bold w-6">7</span></div>
+      <div class="flex items-center gap-3"><span class="text-sm w-20">Soreness</span><input type="range" min="1" max="10" value="3" id="readySoreness" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value"><span class="text-sm font-bold w-6">3</span></div>
+      <div class="flex items-center gap-3"><span class="text-sm w-20">Energy</span><input type="range" min="1" max="10" value="7" id="readyEnergy" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value"><span class="text-sm font-bold w-6">7</span></div>
+      <div class="flex items-center gap-3"><span class="text-sm w-20">Stress</span><input type="range" min="1" max="10" value="3" id="readyStress" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value"><span class="text-sm font-bold w-6">3</span></div>
+      <div class="flex items-center gap-3"><span class="text-sm w-20">Motivation</span><input type="range" min="1" max="10" value="8" id="readyMotivation" class="flex-1 accent-blue-500" oninput="this.nextElementSibling.textContent=this.value"><span class="text-sm font-bold w-6">8</span></div>
+      <button onclick="saveReadiness()" class="btn btn-success w-full">Save Readiness</button>
+    </div>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function saveReadiness() {
+  const r = {
+    date: new Date().toISOString().slice(0, 10),
+    sleep: parseInt(document.getElementById('readySleep').value),
+    soreness: parseInt(document.getElementById('readySoreness').value),
+    energy: parseInt(document.getElementById('readyEnergy').value),
+    stress: parseInt(document.getElementById('readyStress').value),
+    motivation: parseInt(document.getElementById('readyMotivation').value),
+  };
+  r.score = Math.round((r.sleep + (10 - r.soreness) + r.energy + (10 - r.stress) + r.motivation) / 5 * 10);
+  DB.push('readiness', r);
+  closeModal();
+  updateReadinessDisplay(r);
+  showToast('Readiness saved!', 'success');
+}
+
+function updateReadinessDisplay(r) {
+  if (!r) {
+    const all = DB.get('readiness', []);
+    r = all.length ? all[all.length - 1] : null;
+  }
+  if (!r) return;
+  const ind = document.getElementById('readinessIndicator');
+  const color = r.score >= 70 ? '#22c55e' : r.score >= 50 ? '#f59e0b' : '#ef4444';
+  ind.textContent = r.score;
+  ind.style.background = color;
+  ind.style.color = 'white';
+}
+
+function showSettingsModal() {
+  const startDate = DB.get('startDate', new Date().toISOString().slice(0, 10));
+  document.getElementById('modalBody').innerHTML = `
+    <h3 class="font-bold text-lg mb-4">⚙️ Settings</h3>
+    <div class="space-y-3">
+      <div><label class="text-xs text-slate-400">Program Start Date</label><input type="date" id="settStartDate" value="${startDate}"></div>
+      <button onclick="DB.set('startDate',document.getElementById('settStartDate').value);closeModal();showToast('Saved!')" class="btn btn-primary w-full">Save</button>
+      <hr class="border-slate-600">
+      <div class="text-xs text-slate-400">Data Management</div>
+      <button onclick="exportData()" class="btn btn-ghost w-full">Export All Data (JSON)</button>
+      <button onclick="if(confirm('Delete ALL data? This cannot be undone.')){Object.keys(localStorage).filter(k=>k.startsWith('stevi_')).forEach(k=>localStorage.removeItem(k));location.reload()}" class="btn btn-danger w-full">Reset All Data</button>
+    </div>`;
+  document.getElementById('modalOverlay').classList.remove('hidden');
+}
+
+function exportData() {
+  const data = {};
+  Object.keys(localStorage).filter(k => k.startsWith('stevi_')).forEach(k => {
+    data[k.replace('stevi_', '')] = JSON.parse(localStorage.getItem(k));
+  });
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `stevi-tennis-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  showToast('Data exported!', 'success');
+}
+
+function closeModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('modalOverlay').classList.add('hidden');
+}
+
+// ==================== ANALYTICS ====================
+function setAnalyticsPeriod(days, btn) {
+  analyticsPeriod = days;
+  document.querySelectorAll('#pageAnalytics .tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAnalytics();
+}
+
+function renderAnalytics() {
+  renderWeightTrendChart();
+  renderStrengthChart();
+  renderVolumeChart();
+  renderTennisRadar();
+  renderCompliance();
+}
+
+function renderWeightTrendChart() {
+  const bodies = DB.get('body', []).slice(-analyticsPeriod);
+  if (charts.weightTrend) charts.weightTrend.destroy();
+  const ctx = document.getElementById('weightTrendChart');
+  if (!ctx) return;
+  if (!bodies.length) { ctx.parentElement.querySelector('#statWeightCurrent').textContent = '80.0'; return; }
+  document.getElementById('statWeightStart').textContent = bodies[0].weight.toFixed(1);
+  document.getElementById('statWeightCurrent').textContent = bodies[bodies.length - 1].weight.toFixed(1);
+  document.getElementById('statWeightLost').textContent = (bodies[0].weight - bodies[bodies.length - 1].weight).toFixed(1);
+
+  charts.weightTrend = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: bodies.map(b => b.date.slice(5)),
+      datasets: [{
+        label: 'Weight', data: bodies.map(b => b.weight),
+        borderColor: '#3b82f6', borderWidth: 2, fill: true, backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, pointRadius: 3, pointBackgroundColor: '#3b82f6'
+      }, {
+        label: 'Target', data: bodies.map(() => 75),
+        borderColor: '#22c55e', borderWidth: 1, borderDash: [5, 5], pointRadius: 0, fill: false
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 } } } },
+      scales: { x: { ticks: { color: '#64748b', font: { size: 9 }, maxTicksLimit: 10 }, grid: { display: false } },
+        y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } } } }
+  });
+}
+
+function renderStrengthChart() {
+  const sessions = DB.get('sessions', []).filter(s => s.type === 'gym').slice(-50);
+  if (charts.strength) charts.strength.destroy();
+  const ctx = document.getElementById('strengthChart');
+  if (!ctx) return;
+
+  const squatData = [], dlData = [], benchData = [], labels = [];
+  sessions.forEach(s => {
+    if (!s.exercises) return;
+    s.exercises.forEach(ex => {
+      const maxW = Math.max(...ex.sets.map(set => set.weight));
+      if (ex.name.includes('Back Squat')) { squatData.push({ x: s.date, y: maxW }); }
+      if (ex.name.includes('Conventional Deadlift') || ex.name.includes('Deadlift')) { dlData.push({ x: s.date, y: maxW }); }
+      if (ex.name === 'Bench Press') { benchData.push({ x: s.date, y: maxW }); }
+    });
+  });
+
+  const allDates = [...new Set([...squatData.map(d => d.x), ...dlData.map(d => d.x), ...benchData.map(d => d.x)])].sort();
+
+  charts.strength = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: allDates.map(d => d.slice(5)),
+      datasets: [
+        { label: 'Squat', data: squatData.map(d => ({ x: d.x.slice(5), y: d.y })), borderColor: '#3b82f6', borderWidth: 2, tension: 0.3, pointRadius: 3 },
+        { label: 'Deadlift', data: dlData.map(d => ({ x: d.x.slice(5), y: d.y })), borderColor: '#f59e0b', borderWidth: 2, tension: 0.3, pointRadius: 3 },
+        { label: 'Bench', data: benchData.map(d => ({ x: d.x.slice(5), y: d.y })), borderColor: '#ef4444', borderWidth: 2, tension: 0.3, pointRadius: 3 },
+      ]
+    },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 } } } },
+      scales: { x: { ticks: { color: '#64748b', font: { size: 9 } }, grid: { display: false } },
+        y: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { color: '#1e293b' } } } }
+  });
+}
+
+function renderVolumeChart() {
+  const sessions = DB.get('sessions', []);
+  if (charts.volume) charts.volume.destroy();
+  const ctx = document.getElementById('volumeChart');
+  if (!ctx) return;
+
+  const weeks = {};
+  sessions.forEach(s => {
+    const d = new Date(s.date);
+    const weekStart = new Date(d); weekStart.setDate(d.getDate() - d.getDay());
+    const key = weekStart.toISOString().slice(0, 10);
+    if (!weeks[key]) weeks[key] = { gym: 0, tennis: 0, zwift: 0 };
+    weeks[key][s.type] = (weeks[key][s.type] || 0) + 1;
+  });
+
+  const weekKeys = Object.keys(weeks).sort().slice(-12);
+  charts.volume = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: weekKeys.map(k => k.slice(5)),
+      datasets: [
+        { label: 'Gym', data: weekKeys.map(k => weeks[k].gym), backgroundColor: '#3b82f6' },
+        { label: 'Tennis', data: weekKeys.map(k => weeks[k].tennis), backgroundColor: '#22c55e' },
+        { label: 'Zwift', data: weekKeys.map(k => weeks[k].zwift), backgroundColor: '#a855f7' },
+      ]
+    },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 } } } },
+      scales: { x: { stacked: true, ticks: { color: '#64748b', font: { size: 9 } }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: '#64748b', font: { size: 10 }, stepSize: 1 }, grid: { color: '#1e293b' } } } }
+  });
+}
+
+function renderTennisRadar() {
+  const sessions = DB.get('sessions', []).filter(s => s.type === 'tennis' && s.ratings).slice(-10);
+  if (charts.tennisRadar) charts.tennisRadar.destroy();
+  const ctx = document.getElementById('tennisRadarChart');
+  if (!ctx) return;
+
+  const avg = { forehand: 5, backhand: 5, serve: 5, movement: 5, volley: 5 };
+  if (sessions.length) {
+    Object.keys(avg).forEach(k => {
+      avg[k] = Math.round(sessions.reduce((s, sess) => s + (sess.ratings[k] || 5), 0) / sessions.length * 10) / 10;
+    });
+  }
+
+  charts.tennisRadar = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: ['Forehand', 'Backhand', 'Serve', 'Movement', 'Volley'],
+      datasets: [{
+        label: 'Avg Rating', data: [avg.forehand, avg.backhand, avg.serve, avg.movement, avg.volley],
+        borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.15)', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#22c55e'
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } },
+      scales: { r: { min: 0, max: 10, ticks: { stepSize: 2, color: '#64748b', backdropColor: 'transparent' },
+        grid: { color: '#334155' }, angleLines: { color: '#334155' }, pointLabels: { color: '#94a3b8', font: { size: 11 } } } } }
+  });
+}
+
+function renderCompliance() {
+  const now = new Date();
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
+  const weekKey = weekStart.toISOString().slice(0, 10);
+  const sessions = DB.get('sessions', []).filter(s => s.date >= weekKey);
+  const bodies = DB.get('body', []).filter(b => b.date >= weekKey);
+
+  const gymTarget = 4, tennisTarget = 2;
+  const gymDone = sessions.filter(s => s.type === 'gym').length;
+  const tennisDone = sessions.filter(s => s.type === 'tennis').length;
+  const nutritionDays = bodies.filter(b => b.calories).length;
+  const recoveryDays = DB.get('readiness', []).filter(r => r.date >= weekKey).length;
+
+  document.getElementById('compGym').textContent = Math.min(100, Math.round(gymDone / gymTarget * 100)) + '%';
+  document.getElementById('compTennis').textContent = Math.min(100, Math.round(tennisDone / tennisTarget * 100)) + '%';
+  document.getElementById('compNutrition').textContent = Math.min(100, Math.round(nutritionDays / 7 * 100)) + '%';
+  document.getElementById('compRecovery').textContent = Math.min(100, Math.round(recoveryDays / 7 * 100)) + '%';
+}
+
+// ==================== COACH AI ====================
+function renderCoach() {
+  updateReadinessDisplay();
+  renderGoalProgress();
+  renderInjuryRisk();
+  renderNextSession();
+  renderMilestones();
+  generateCoachInsights();
+}
+
+function renderGoalProgress() {
+  const prs = DB.get('prs', { squat: 148, deadlift: 178, bench: 70 });
+  const bodies = DB.get('body', []);
+  const currentW = bodies.length ? bodies[bodies.length - 1].weight : 80;
+  const sessions = DB.get('sessions', []).filter(s => s.type === 'tennis' && s.serves && s.serves.total > 0);
+  const recentServe = sessions.slice(-5);
+  const avgServe = recentServe.length ? Math.round(recentServe.reduce((s, sess) => s + (sess.serves.in / sess.serves.total * 100), 0) / recentServe.length) : 0;
+
+  const dlPct = Math.round((prs.deadlift / 200) * 100);
+  const weightPct = Math.round(((80 - currentW) / (80 - 75)) * 100);
+  const servePct = Math.min(100, Math.round(avgServe / 70 * 100));
+
+  document.getElementById('goalDL').textContent = dlPct + '%';
+  document.getElementById('goalDLBar').style.width = dlPct + '%';
+  document.getElementById('goalWeight').textContent = Math.max(0, weightPct) + '%';
+  document.getElementById('goalWeightBar').style.width = Math.max(0, weightPct) + '%';
+  document.getElementById('goalServe').textContent = avgServe ? avgServe + '%' : '--';
+  document.getElementById('goalServeBar').style.width = servePct + '%';
+
+  const readiness = DB.get('readiness', []);
+  const latest = readiness.length ? readiness[readiness.length - 1] : null;
+  if (latest) {
+    document.getElementById('readinessScore').textContent = latest.score;
+    document.getElementById('readSleep').textContent = latest.sleep + '/10';
+    document.getElementById('readSoreness').textContent = latest.soreness + '/10';
+    document.getElementById('readEnergy').textContent = latest.energy + '/10';
+    document.getElementById('readStress').textContent = latest.stress + '/10';
+    const offset = 220 - (latest.score / 100 * 220);
+    document.getElementById('readinessRing').style.strokeDashoffset = offset;
+    const color = latest.score >= 70 ? '#22c55e' : latest.score >= 50 ? '#f59e0b' : '#ef4444';
+    document.getElementById('readinessRing').style.stroke = color;
+  }
+}
+
+function renderInjuryRisk() {
+  const sessions = DB.get('sessions', []);
+  const last7 = sessions.filter(s => {
+    const d = new Date(s.date);
+    return (new Date() - d) / 86400000 <= 7;
+  });
+  const tennisCount = last7.filter(s => s.type === 'tennis').length;
+  const gymCount = last7.filter(s => s.type === 'gym').length;
+  const totalLoad = tennisCount + gymCount;
+  const readiness = DB.get('readiness', []);
+  const latestR = readiness.length ? readiness[readiness.length - 1] : { soreness: 3 };
+
+  function riskLevel(risk) {
+    if (risk >= 7) return ['High', 'bg-red-500/20 text-red-400'];
+    if (risk >= 4) return ['Medium', 'bg-amber-500/20 text-amber-400'];
+    return ['Low', 'bg-green-500/20 text-green-400'];
+  }
+
+  const elbowRisk = Math.min(10, tennisCount * 1.5 + (latestR.soreness > 6 ? 3 : 0));
+  const shoulderRisk = Math.min(10, tennisCount * 1 + gymCount * 0.5 + (latestR.soreness > 7 ? 2 : 0));
+  const backRisk = Math.min(10, gymCount * 1.2 + (latestR.soreness > 6 ? 2 : 0));
+  const kneeRisk = Math.min(10, totalLoad * 0.8 + (latestR.soreness > 7 ? 2 : 0));
+
+  [[elbowRisk, 'riskElbow'], [shoulderRisk, 'riskShoulder'], [backRisk, 'riskBack'], [kneeRisk, 'riskKnee']].forEach(([risk, id]) => {
+    const [label, cls] = riskLevel(risk);
+    const el = document.getElementById(id);
+    el.textContent = label;
+    el.className = `badge ${cls}`;
+  });
+}
+
+function renderNextSession() {
+  const sessions = DB.get('sessions', []);
+  const today = new Date().getDay();
+  const plan = WEEK_PLAN[today];
+  const readiness = DB.get('readiness', []);
+  const latestR = readiness.length ? readiness[readiness.length - 1] : null;
+
+  let recommendation = plan.label;
+  let intensity = 'As programmed';
+  let note = '';
+
+  if (latestR) {
+    if (latestR.score < 40) {
+      recommendation = 'Active Recovery Only';
+      intensity = 'Light / RPE 3-4';
+      note = '⚠️ Readiness is low. Consider rest or light Zwift recovery ride.';
+    } else if (latestR.score < 60) {
+      intensity = 'Reduced / RPE 6-7 max';
+      note = '⚡ Moderate readiness. Reduce volume by 20-30%.';
+    } else {
+      note = '✅ Good readiness. Train as planned.';
+    }
+  }
+
+  document.getElementById('nextSession').innerHTML = `
+    <div class="bg-slate-700/30 rounded-lg p-3">
+      <div class="flex items-center gap-2 mb-1"><span class="text-xl">${plan.icon}</span><span class="font-bold text-sm">${recommendation}</span></div>
+      <div class="text-xs text-blue-400">Intensity: ${intensity}</div>
+      <div class="text-xs text-slate-400 mt-1">${note}</div>
+    </div>`;
+}
+
+function generateCoachInsights() {
+  const insights = [];
+  const bodies = DB.get('body', []);
+  const sessions = DB.get('sessions', []);
+  const prs = DB.get('prs', { squat: 148, deadlift: 178, bench: 70 });
+  const readiness = DB.get('readiness', []);
+
+  // Weight analysis
+  if (bodies.length >= 3) {
+    const recent = bodies.slice(-7);
+    const trend = recent[recent.length - 1].weight - recent[0].weight;
+    if (trend > 0.5) {
+      insights.push({ type: 'warn', icon: '⚠️', title: 'Weight Trending Up', msg: `You gained ${trend.toFixed(1)}kg recently. Review calorie intake. Target deficit: 300-500 kcal/day for 0.25-0.5 kg/week loss.` });
+    } else if (trend < -1) {
+      insights.push({ type: 'warn', icon: '⚡', title: 'Rapid Weight Loss', msg: `You lost ${Math.abs(trend).toFixed(1)}kg in a week. Slow down to preserve muscle. Max recommended: 0.5 kg/week.` });
+    } else if (trend < 0) {
+      insights.push({ type: 'success', icon: '✅', title: 'Weight On Track', msg: `Down ${Math.abs(trend).toFixed(1)}kg. Good pace toward 75kg target.` });
+    }
+  } else {
+    insights.push({ type: 'info', icon: '📝', title: 'Start Tracking Weight', msg: 'Log your weight daily (morning, fasted) to establish a trend. Need at least 7 entries for meaningful analysis.' });
+  }
+
+  // Deadlift progress
+  const dlGap = 200 - prs.deadlift;
+  if (dlGap > 0) {
+    insights.push({ type: 'info', icon: '🎯', title: `Deadlift: ${dlGap}kg to Goal`, msg: `Current: ${prs.deadlift}kg. At 1-2kg/month progression while cutting, expect ~${Math.ceil(dlGap / 1.5)} months to 200kg. Focus on RPE 7-8 triples.` });
+  } else {
+    insights.push({ type: 'success', icon: '🏆', title: 'Deadlift Goal Achieved!', msg: `You hit ${prs.deadlift}kg! Time to set a new target.` });
+  }
+
+  // Training frequency
+  const last14 = sessions.filter(s => (new Date() - new Date(s.date)) / 86400000 <= 14);
+  const gymFreq = last14.filter(s => s.type === 'gym').length;
+  const tennisFreq = last14.filter(s => s.type === 'tennis').length;
+  if (gymFreq < 6) {
+    insights.push({ type: 'warn', icon: '🏋️', title: 'Low Gym Frequency', msg: `${gymFreq} gym sessions in 14 days (target: 8). Consistency is key for strength gains while cutting.` });
+  }
+  if (tennisFreq < 3) {
+    insights.push({ type: 'warn', icon: '🎾', title: 'More Court Time Needed', msg: `${tennisFreq} tennis sessions in 14 days (target: 4). Movement skills need regular practice, especially during badminton transition.` });
+  }
+
+  // Tennis serve
+  const serveSessions = sessions.filter(s => s.type === 'tennis' && s.serves && s.serves.total > 5).slice(-5);
+  if (serveSessions.length >= 3) {
+    const avgServe = Math.round(serveSessions.reduce((s, sess) => s + (sess.serves.in / sess.serves.total * 100), 0) / serveSessions.length);
+    if (avgServe < 55) {
+      insights.push({ type: 'warn', icon: '🎾', title: `Serve: ${avgServe}% — Needs Work`, msg: 'Focus on toss consistency drills (Chapter 19). Target: 60%+ first serve percentage. Practice 30 serves per session with target placement.' });
+    } else if (avgServe >= 65) {
+      insights.push({ type: 'success', icon: '🎯', title: `Serve: ${avgServe}% — Strong`, msg: 'Good consistency. Start varying placement and adding slice/kick serve development.' });
+    }
+  }
+
+  // Recovery
+  if (readiness.length >= 3) {
+    const avgR = Math.round(readiness.slice(-3).reduce((s, r) => s + r.score, 0) / 3);
+    if (avgR < 50) {
+      insights.push({ type: 'danger', icon: '🔴', title: 'Recovery Deficit', msg: `Average readiness: ${avgR}/100. Consider a deload week. Prioritize sleep (8+ hours) and reduce training volume by 40%.` });
+    }
+  }
+
+  // Protein check
+  const recentBodies = bodies.filter(b => b.protein).slice(-7);
+  if (recentBodies.length >= 3) {
+    const avgProtein = Math.round(recentBodies.reduce((s, b) => s + b.protein, 0) / recentBodies.length);
+    const targetProtein = Math.round((bodies.length ? bodies[bodies.length - 1].weight : 80) * 2.2);
+    if (avgProtein < targetProtein * 0.85) {
+      insights.push({ type: 'warn', icon: '🥩', title: 'Protein Too Low', msg: `Averaging ${avgProtein}g/day. Target: ${targetProtein}g (2.2g/kg). Critical for preserving muscle while cutting.` });
+    }
+  }
+
+  // Push/pull balance
+  const pullSessions = sessions.filter(s => s.type === 'gym' && s.session === 'pull').length;
+  const pushSessions = sessions.filter(s => s.type === 'gym' && s.session === 'push').length;
+  if (pushSessions > 0 && pullSessions < pushSessions * 1.5) {
+    insights.push({ type: 'info', icon: '💪', title: 'Increase Pull Volume', msg: 'Tennis players need 2:1 pull-to-push ratio for shoulder health. Add extra face pulls and band pull-aparts.' });
+  }
+
+  // Default
+  if (!insights.length) {
+    insights.push({ type: 'info', icon: '📊', title: 'Start Logging', msg: 'Log training sessions, body metrics, and tennis sessions to unlock personalized coaching insights.' });
+  }
+
+  const el = document.getElementById('coachInsights');
+  const colors = { success: 'border-green-500 bg-green-500/5', warn: 'border-amber-500 bg-amber-500/5', danger: 'border-red-500 bg-red-500/5', info: 'border-blue-500 bg-blue-500/5' };
+  el.innerHTML = insights.map(i => `
+    <div class="coach-card ${colors[i.type]}">
+      <div class="font-semibold text-sm">${i.icon} ${i.title}</div>
+      <div class="text-xs text-slate-300 mt-1">${i.msg}</div>
+    </div>`).join('');
+}
+
+function renderMilestones() {
+  const prs = DB.get('prs', { squat: 148, deadlift: 178, bench: 70 });
+  const bodies = DB.get('body', []);
+  const currentW = bodies.length ? bodies[bodies.length - 1].weight : 80;
+  const sessions = DB.get('sessions', []);
+
+  const milestones = [
+    { label: 'First Week Complete', done: sessions.length >= 6, icon: '🌟' },
+    { label: 'Weight Under 79kg', done: currentW < 79, icon: '⚖️' },
+    { label: 'Weight Under 77kg', done: currentW < 77, icon: '⚖️' },
+    { label: 'Target Weight 75kg', done: currentW <= 75, icon: '🏆' },
+    { label: 'Deadlift 180kg', done: prs.deadlift >= 180, icon: '🏋️' },
+    { label: 'Deadlift 190kg', done: prs.deadlift >= 190, icon: '🏋️' },
+    { label: 'Deadlift 200kg', done: prs.deadlift >= 200, icon: '🏆' },
+    { label: '10 Tennis Sessions', done: sessions.filter(s => s.type === 'tennis').length >= 10, icon: '🎾' },
+    { label: '50 Tennis Sessions', done: sessions.filter(s => s.type === 'tennis').length >= 50, icon: '🎾' },
+    { label: 'First Match Win', done: sessions.some(s => s.matchResult === 'win'), icon: '🏆' },
+    { label: '30 Days Tracked', done: bodies.length >= 30, icon: '📊' },
+    { label: 'Bench 80kg', done: prs.bench >= 80, icon: '💪' },
+    { label: 'Squat 150kg', done: prs.squat >= 150, icon: '💪' },
+  ];
+
+  document.getElementById('milestones').innerHTML = milestones.map(m => `
+    <div class="flex items-center gap-2 ${m.done ? '' : 'opacity-50'}">
+      <span class="text-lg">${m.done ? '✅' : '⬜'}</span>
+      <span class="text-sm ${m.done ? 'line-through text-slate-400' : ''}">${m.icon} ${m.label}</span>
+    </div>`).join('');
+}
+
+// ==================== INIT ====================
+function init() {
+  if (!DB.get('startDate')) DB.set('startDate', new Date().toISOString().slice(0, 10));
+  if (!DB.get('prs')) DB.set('prs', { squat: 148, deadlift: 178, bench: 70 });
+
+  renderDashboard();
+  populateExercises();
+  updateReadinessDisplay();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
